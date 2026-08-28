@@ -271,10 +271,24 @@ export const HistoryDetail: React.FC = () => {
                   <td className="px-6 py-5 text-center font-bold text-pms-gray">{kpi.weightage}%</td>
                   <td className="px-6 py-5 text-center font-semibold text-slate-500">{kpi.selfRating !== null ? kpi.selfRating.toFixed(1) : 'N/A'}</td>
                   <td className="px-6 py-5 text-center font-semibold text-pms-darkGreen">{kpi.managerRating !== null ? kpi.managerRating.toFixed(1) : 'N/A'}</td>
-                  <td className="px-6 py-5 text-center font-semibold text-pms-green">{kpi.hrRating !== null ? kpi.hrRating.toFixed(1) : 'N/A'}</td>
+                  <td className="px-6 py-5 text-center font-semibold text-pms-green">
+                    {kpi.hrRating !== null
+                      ? kpi.hrRating.toFixed(1)
+                      : kpi.managerRating !== null
+                      ? kpi.managerRating.toFixed(1)
+                      : kpi.selfRating !== null
+                      ? kpi.selfRating.toFixed(1)
+                      : 'N/A'}
+                  </td>
                   <td className="px-6 py-5 text-center">
                     <span className="font-bold text-pms-gray bg-slate-100 border border-slate-200 px-2 py-0.5 rounded">
-                      {kpi.hrRating !== null ? kpi.hrRating.toFixed(1) : 'N/A'}
+                      {kpi.hrRating !== null
+                        ? kpi.hrRating.toFixed(1)
+                        : kpi.managerRating !== null
+                        ? kpi.managerRating.toFixed(1)
+                        : kpi.selfRating !== null
+                        ? kpi.selfRating.toFixed(1)
+                        : 'N/A'}
                     </span>
                   </td>
                 </tr>

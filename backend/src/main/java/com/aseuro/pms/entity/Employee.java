@@ -21,8 +21,8 @@ import org.hibernate.type.SqlTypes;
 import java.time.Instant;
 import java.time.LocalDate;
 
-@Entity
-@Table(name = "employees")
+@Entity(name = "HrLegacyEmployee")
+@Table(name = "hr_legacy_employees")
 @Getter
 @Setter
 @NoArgsConstructor

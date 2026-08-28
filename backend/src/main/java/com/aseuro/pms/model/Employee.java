@@ -29,6 +29,10 @@ public class Employee {
     private String department;
     private String team;
     private String designation;
+    private String phone;
+
+    @Column(columnDefinition = "TEXT")
+    private String profilePhoto;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "manager_id")

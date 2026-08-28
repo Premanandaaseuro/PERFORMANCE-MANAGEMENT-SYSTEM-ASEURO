@@ -5,9 +5,8 @@ import com.aseuro.pms.security.UserPrincipal;
 import com.aseuro.pms.service.EmployeeService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import com.aseuro.pms.dto.UpdateProfileRequest;
 
 @RestController
 @RequestMapping("/employee")
@@ -23,5 +22,13 @@ public class EmployeeController {
     public ResponseEntity<EmployeeDto> getProfile(@AuthenticationPrincipal UserPrincipal userPrincipal) {
         EmployeeDto profile = employeeService.getEmployeeProfile(userPrincipal.getId());
         return ResponseEntity.ok(profile);
+    }
+
+    @PutMapping("/profile")
+    public ResponseEntity<EmployeeDto> updateProfile(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @RequestBody UpdateProfileRequest request) {
+        EmployeeDto updated = employeeService.updateProfile(userPrincipal.getId(), request);
+        return ResponseEntity.ok(updated);
     }
 }

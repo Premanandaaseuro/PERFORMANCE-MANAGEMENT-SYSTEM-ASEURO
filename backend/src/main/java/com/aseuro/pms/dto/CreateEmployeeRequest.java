@@ -1,41 +1,45 @@
 package com.aseuro.pms.dto;
 
-import com.aseuro.pms.entity.UserRole;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 
-public record CreateEmployeeRequest(
-        @NotBlank(message = "Employee code is required")
-        String employeeCode,
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class CreateEmployeeRequest {
+    private String employeeCode;
+    private String fullName;
+    private String name;
+    private String email;
+    private String password;
+    private String role;
+    private String department;
+    private Long departmentId;
+    private String designation;
+    private Long designationId;
+    private String team;
+    private Long teamId;
+    private Long managerId;
+    private LocalDate joiningDate;
 
-        @NotBlank(message = "Full name is required")
-        String fullName,
+    public String getEffectiveName() {
+        if (fullName != null && !fullName.trim().isEmpty()) return fullName.trim();
+        if (name != null && !name.trim().isEmpty()) return name.trim();
+        return "Employee";
+    }
 
-        @NotBlank(message = "Email is required")
-        @Email(message = "Invalid email format")
-        String email,
-
-        @NotBlank(message = "Password is required")
-        @Size(min = 8, message = "Password must be at least 8 characters long")
-        String password,
-
-        @NotNull(message = "Role is required (EMPLOYEE or MANAGER)")
-        UserRole role,
-
-        @NotNull(message = "Department is required")
-        Long departmentId,
-
-        @NotNull(message = "Designation is required")
-        Long designationId,
-
-        Long teamId,
-
-        Long managerId,
-
-        @NotNull(message = "Joining date is required")
-        LocalDate joiningDate
-) {}
+    public String employeeCode() { return this.employeeCode; }
+    public String fullName() { return this.getEffectiveName(); }
+    public String email() { return this.email; }
+    public String password() { return this.password; }
+    public Long departmentId() { return this.departmentId; }
+    public Long designationId() { return this.designationId; }
+    public Long teamId() { return this.teamId; }
+    public Long managerId() { return this.managerId; }
+    public LocalDate joiningDate() { return this.joiningDate; }
+}

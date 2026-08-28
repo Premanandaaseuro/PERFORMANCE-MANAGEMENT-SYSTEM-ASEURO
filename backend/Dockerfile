@@ -1,10 +1,3 @@
-<<<<<<< HEAD
-FROM eclipse-temurin:17-jre-alpine
-WORKDIR /app
-COPY target/*.jar app.jar
-EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
-=======
 FROM maven:3.9.9-eclipse-temurin-17 AS builder
 WORKDIR /workspace
 COPY . .
@@ -13,6 +6,5 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:17-jre
 WORKDIR /app
 COPY --from=builder /workspace/target/*.jar /app/app.jar
-EXPOSE 8081
+EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
->>>>>>> 7e242a5ead40c3cafff0fc936fda8630cb8d09d3

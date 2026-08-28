@@ -24,6 +24,7 @@ public class PmsService {
     private final EmployeeReviewRepository employeeReviewRepository;
     private final FinalPmsResultRepository finalPmsResultRepository;
     private final PmsHistoryRepository pmsHistoryRepository;
+    private final KpiMasterRepository kpiMasterRepository;
 
     public PmsService(
             EmployeeRepository employeeRepository,
@@ -32,7 +33,8 @@ public class PmsService {
             EmployeeKpiRatingRepository employeeKpiRatingRepository,
             EmployeeReviewRepository employeeReviewRepository,
             FinalPmsResultRepository finalPmsResultRepository,
-            PmsHistoryRepository pmsHistoryRepository) {
+            PmsHistoryRepository pmsHistoryRepository,
+            KpiMasterRepository kpiMasterRepository) {
         this.employeeRepository = employeeRepository;
         this.pmsAssignmentRepository = pmsAssignmentRepository;
         this.pmsKpiRepository = pmsKpiRepository;
@@ -40,6 +42,7 @@ public class PmsService {
         this.employeeReviewRepository = employeeReviewRepository;
         this.finalPmsResultRepository = finalPmsResultRepository;
         this.pmsHistoryRepository = pmsHistoryRepository;
+        this.kpiMasterRepository = kpiMasterRepository;
     }
 
     @Transactional(readOnly = true)
@@ -47,7 +50,8 @@ public class PmsService {
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new IllegalArgumentException("Employee not found"));
 
-        Optional<PmsAssignment> currentAssignmentOpt = pmsAssignmentRepository.findFirstByEmployeeOrderByStartDateDesc(employee);
+        Optional<PmsAssignment> currentAssignmentOpt = pmsAssignmentRepository
+                .findFirstByEmployeeOrderByStartDateDesc(employee);
 
         if (currentAssignmentOpt.isEmpty()) {
             return DashboardResponse.builder()
@@ -72,7 +76,8 @@ public class PmsService {
             if (rating.getSelfRating() != null) {
                 completedKpis++;
                 // Find matching KPI weightage
-                Optional<PmsKpi> matchedKpi = kpis.stream().filter(k -> k.getId().equals(rating.getKpi().getId())).findFirst();
+                Optional<PmsKpi> matchedKpi = kpis.stream().filter(k -> k.getId().equals(rating.getKpi().getId()))
+                        .findFirst();
                 if (matchedKpi.isPresent()) {
                     completedWeightage += matchedKpi.get().getWeightage();
                 }
@@ -101,7 +106,8 @@ public class PmsService {
         } else if (state == PMSState.MANAGER_REVIEW_SUBMITTED || state == PMSState.HR_REVIEW_PENDING) {
             managerReviewStatus = "Completed";
             actionRequired = "Awaiting HR review and final publishing.";
-        } else if (state == PMSState.HR_REVIEW_COMPLETED || state == PMSState.FINAL_RESULT_PUBLISHED || state == PMSState.COMPLETED) {
+        } else if (state == PMSState.HR_REVIEW_COMPLETED || state == PMSState.FINAL_RESULT_PUBLISHED
+                || state == PMSState.COMPLETED) {
             managerReviewStatus = "Completed";
             hrReviewStatus = "Completed";
             actionRequired = "PMS completed. You can view your finalized results in History / Reports.";
@@ -121,13 +127,48 @@ public class PmsService {
                 .build();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public PmsAssignmentDto getCurrentAssignment(Long employeeId) {
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new IllegalArgumentException("Employee not found"));
 
-        PmsAssignment assignment = pmsAssignmentRepository.findFirstByEmployeeOrderByStartDateDesc(employee)
-                .orElseThrow(() -> new IllegalArgumentException("No active PMS cycle found"));
+        Optional<PmsAssignment> assignmentOpt = pmsAssignmentRepository.findFirstByEmployeeOrderByStartDateDesc(employee);
+
+        PmsAssignment assignment;
+        if (assignmentOpt.isPresent()) {
+            assignment = assignmentOpt.get();
+        } else {
+            // Auto-create active PMS cycle for this employee / manager
+            assignment = PmsAssignment.builder()
+                    .employee(employee)
+                    .cycleMonth("August 2026")
+                    .status(PMSState.SELF_ASSESSMENT_DRAFT)
+                    .startDate(LocalDate.of(2026, 8, 1))
+                    .endDate(LocalDate.of(2026, 8, 31))
+                    .submissionDeadline(LocalDate.of(2026, 9, 10))
+                    .build();
+            assignment = pmsAssignmentRepository.save(assignment);
+
+            String designation = employee.getDesignation() != null ? employee.getDesignation().trim() : "Software Engineer";
+            List<KpiMaster> masterKpis = kpiMasterRepository.findByDesignationIgnoreCaseAndStatus(designation, "ACTIVE");
+            if (masterKpis.isEmpty()) {
+                masterKpis = kpiMasterRepository.findByDesignationIgnoreCaseAndStatus("Software Engineer", "ACTIVE");
+            }
+
+            List<PmsKpi> assignedKpis = new ArrayList<>();
+            for (KpiMaster km : masterKpis) {
+                PmsKpi k = PmsKpi.builder()
+                        .assignment(assignment)
+                        .kpiName(km.getKpiName())
+                        .description(km.getDescription())
+                        .weightage(km.getWeightage())
+                        .build();
+                assignedKpis.add(k);
+            }
+            if (!assignedKpis.isEmpty()) {
+                pmsKpiRepository.saveAll(assignedKpis);
+            }
+        }
 
         return getAssignmentDto(assignment);
     }
@@ -206,8 +247,7 @@ public class PmsService {
                 .grade(h.getGrade())
                 .finalizedDate(h.getFinalizedDate())
                 .filePath(h.getFilePath())
-                .build()
-        ).collect(Collectors.toList());
+                .build()).collect(Collectors.toList());
     }
 
     // Helper methods
@@ -292,6 +332,12 @@ public class PmsService {
 
         List<KpiDto> kpiDtos = kpis.stream().map(k -> {
             EmployeeKpiRating r = ratingMap.get(k.getId());
+            Double effectiveHrRating = r != null ? r.getHrRating() : null;
+            if (effectiveHrRating == null && (assignment.getStatus() == PMSState.COMPLETED || assignment.getStatus() == PMSState.FINAL_RESULT_PUBLISHED)) {
+                if (r != null && r.getManagerRating() != null) effectiveHrRating = r.getManagerRating();
+                else if (r != null && r.getSelfRating() != null) effectiveHrRating = r.getSelfRating();
+                else if (assignment.getOverallScore() != null) effectiveHrRating = assignment.getOverallScore();
+            }
             return KpiDto.builder()
                     .kpiId(k.getId())
                     .kpiName(k.getKpiName())
@@ -299,7 +345,7 @@ public class PmsService {
                     .weightage(k.getWeightage())
                     .selfRating(r != null ? r.getSelfRating() : null)
                     .managerRating(r != null ? r.getManagerRating() : null)
-                    .hrRating(r != null ? r.getHrRating() : null)
+                    .hrRating(effectiveHrRating)
                     .comments(r != null ? r.getComments() : null)
                     .ratingStatus(r != null ? r.getStatus() : "PENDING")
                     .build();
@@ -311,8 +357,7 @@ public class PmsService {
                 .reviewerRole(r.getReviewer().getRole().name().replace("ROLE_", ""))
                 .comments(r.getComments())
                 .reviewDate(r.getReviewDate())
-                .build()
-        ).collect(Collectors.toList());
+                .build()).collect(Collectors.toList());
 
         return PmsAssignmentDto.builder()
                 .assignmentId(assignment.getId())
@@ -338,15 +383,15 @@ public class PmsService {
         List<PmsAssignment> assignments = pmsAssignmentRepository.findByEmployee(employee);
         for (PmsAssignment assignment : assignments) {
             if ("August 2026".equals(assignment.getCycleMonth())) {
-                assignment.setStatus(PMSState.PMS_STARTED);
+                assignment.setStatus(PMSState.SELF_ASSESSMENT_DRAFT);
+                assignment.setOverallScore(null);
+                assignment.setPerformanceGrade(null);
+                assignment.setFinalizedDate(null);
                 pmsAssignmentRepository.save(assignment);
 
                 List<EmployeeKpiRating> ratings = employeeKpiRatingRepository.findByAssignment(assignment);
-                for (EmployeeKpiRating rating : ratings) {
-                    rating.setSelfRating(null);
-                    rating.setComments(null);
-                    rating.setStatus("PENDING");
-                    employeeKpiRatingRepository.save(rating);
+                if (!ratings.isEmpty()) {
+                    employeeKpiRatingRepository.deleteAll(ratings);
                 }
             }
         }

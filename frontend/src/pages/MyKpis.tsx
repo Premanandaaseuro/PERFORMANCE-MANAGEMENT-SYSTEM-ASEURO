@@ -20,12 +20,12 @@ export const MyKpis: React.FC = () => {
   const [assignment, setAssignment] = useState<PmsAssignment | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Local states for ratings and comments
   const [ratings, setRatings] = useState<Record<number, number | null>>({});
   const [comments, setComments] = useState<Record<number, string>>({});
   const [validationErrors, setValidationErrors] = useState<Record<number, string>>({});
-  
+
   // UI states
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [submitModalOpen, setSubmitModalOpen] = useState(false);
@@ -93,7 +93,7 @@ export const MyKpis: React.FC = () => {
   // Compute stats
   const totalKpis = assignment.kpis.length;
   const completedKpis = assignment.kpis.filter((kpi) => ratings[kpi.kpiId] !== null && ratings[kpi.kpiId] !== undefined).length;
-  
+
   // Compute weightage progress
   let completedWeightage = 0;
   assignment.kpis.forEach((kpi) => {
@@ -222,7 +222,7 @@ export const MyKpis: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      
+
       {/* Top Header Card */}
       <div className="bg-white border border-slate-200/60 rounded-xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
@@ -231,16 +231,16 @@ export const MyKpis: React.FC = () => {
             <StatusBadge status={assignment.status} />
           </div>
           <p className="text-xs text-slate-500 mt-2">
-            PMS Appraisal Cycle: <span className="font-semibold text-pms-gray">{assignment.cycleMonth}</span> | 
+            PMS Appraisal Cycle: <span className="font-semibold text-pms-gray">{assignment.cycleMonth}</span> |
             Deadline: <span className="font-semibold text-rose-600">{formatDeadline(assignment.submissionDeadline)}</span>
           </p>
         </div>
 
         {/* Read-only Lock Indicator */}
         {isReadOnly && (
-          <div className="flex items-center space-x-2.5 px-4 py-2 bg-slate-50 border border-slate-200 text-slate-500 text-xs font-semibold rounded-lg self-start md:self-auto shadow-inner">
-            <Lock size={16} className="text-slate-400" />
-            <span>FINALIZED / LOCKED</span>
+          <div className="flex items-center space-x-2 px-3.5 py-2 bg-slate-50 border border-slate-200 text-slate-500 text-xs font-semibold rounded-lg self-start md:self-auto shadow-inner">
+            <Lock size={15} className="text-slate-400" />
+            <span>SUBMITTED / LOCKED</span>
           </div>
         )}
       </div>
@@ -293,7 +293,7 @@ export const MyKpis: React.FC = () => {
 
       {/* Main KPI list (Table for Desktop, Cards for Mobile) */}
       <div className="bg-white border border-slate-200/60 rounded-xl overflow-hidden shadow-sm">
-        
+
         {/* Desktop Table View */}
         <div className="hidden md:block overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-150">
@@ -310,7 +310,7 @@ export const MyKpis: React.FC = () => {
               {assignment.kpis.map((kpi) => {
                 const ratingError = validationErrors[kpi.kpiId];
                 const currentRating = ratings[kpi.kpiId];
-                
+
                 return (
                   <tr key={kpi.kpiId} className="hover:bg-slate-50/50 transition-colors">
                     {/* KPI details */}
@@ -344,12 +344,11 @@ export const MyKpis: React.FC = () => {
                                 const val = e.target.value === '' ? null : Number(e.target.value);
                                 handleRatingChange(kpi.kpiId, val);
                               }}
-                              className={`w-20 px-3 py-2 border rounded-lg text-sm font-semibold text-pms-gray text-center focus:outline-none focus:ring-2 focus:ring-pms-green/50 focus:border-pms-green transition-all ${
-                                ratingError ? 'border-rose-400 bg-rose-50/20' : 'border-slate-200'
-                              }`}
+                              className={`w-20 px-3 py-2 border rounded-lg text-sm font-semibold text-pms-gray text-center focus:outline-none focus:ring-2 focus:ring-pms-green/50 focus:border-pms-green transition-all ${ratingError ? 'border-rose-400 bg-rose-50/20' : 'border-slate-200'
+                                }`}
                               placeholder="0.0"
                             />
-                            
+
                             {/* Simple Quick Scale Buttons */}
                             <div className="flex space-x-1">
                               {[1, 2, 3, 4, 5].map((num) => (
@@ -357,11 +356,10 @@ export const MyKpis: React.FC = () => {
                                   key={num}
                                   type="button"
                                   onClick={() => handleRatingChange(kpi.kpiId, num)}
-                                  className={`px-2.5 py-1.5 text-xs font-bold border rounded transition-all ${
-                                    currentRating === num
-                                      ? 'bg-pms-green text-white border-pms-green shadow-sm'
-                                      : 'bg-white hover:bg-slate-50 text-slate-500 border-slate-200'
-                                  }`}
+                                  className={`px-2.5 py-1.5 text-xs font-bold border rounded transition-all ${currentRating === num
+                                    ? 'bg-pms-green text-white border-pms-green shadow-sm'
+                                    : 'bg-white hover:bg-slate-50 text-slate-500 border-slate-200'
+                                    }`}
                                 >
                                   {num}
                                 </button>
@@ -402,11 +400,10 @@ export const MyKpis: React.FC = () => {
 
                     {/* StatusBadge column */}
                     <td className="px-6 py-6 text-center">
-                      <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                        currentRating !== null && currentRating !== undefined
-                          ? 'bg-pms-lightGreen text-pms-darkGreen border border-pms-green/10'
-                          : 'bg-slate-100 text-slate-500 border border-slate-200'
-                      }`}>
+                      <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold ${currentRating !== null && currentRating !== undefined
+                        ? 'bg-pms-lightGreen text-pms-darkGreen border border-pms-green/10'
+                        : 'bg-slate-100 text-slate-500 border border-slate-200'
+                        }`}>
                         {currentRating !== null && currentRating !== undefined ? 'COMPLETED' : 'PENDING'}
                       </span>
                     </td>
@@ -433,11 +430,10 @@ export const MyKpis: React.FC = () => {
                       Weight: {kpi.weightage}%
                     </span>
                   </div>
-                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                    currentRating !== null && currentRating !== undefined
-                      ? 'bg-pms-lightGreen text-pms-darkGreen'
-                      : 'bg-slate-100 text-slate-500'
-                  }`}>
+                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${currentRating !== null && currentRating !== undefined
+                    ? 'bg-pms-lightGreen text-pms-darkGreen'
+                    : 'bg-slate-100 text-slate-500'
+                    }`}>
                     {currentRating !== null && currentRating !== undefined ? 'COMPLETED' : 'PENDING'}
                   </span>
                 </div>
@@ -472,11 +468,10 @@ export const MyKpis: React.FC = () => {
                               key={num}
                               type="button"
                               onClick={() => handleRatingChange(kpi.kpiId, num)}
-                              className={`px-2 py-1 text-xs font-bold border rounded ${
-                                currentRating === num
-                                  ? 'bg-pms-green text-white border-pms-green'
-                                  : 'bg-white text-slate-500 border-slate-200'
-                              }`}
+                              className={`px-2 py-1 text-xs font-bold border rounded ${currentRating === num
+                                ? 'bg-pms-green text-white border-pms-green'
+                                : 'bg-white text-slate-500 border-slate-200'
+                                }`}
                             >
                               {num}
                             </button>
@@ -522,7 +517,7 @@ export const MyKpis: React.FC = () => {
             <Save size={16} />
             <span>Save Draft</span>
           </button>
-          
+
           <button
             onClick={() => setSubmitModalOpen(true)}
             className="flex items-center space-x-2 px-5 py-2.5 bg-pms-green hover:bg-pms-darkGreen text-white font-semibold text-sm rounded-lg shadow-md hover:shadow-lg transition-all"
@@ -541,7 +536,7 @@ export const MyKpis: React.FC = () => {
               <AlertCircle size={24} />
               <h3 className="text-lg font-bold text-pms-gray">Submit Self Assessment?</h3>
             </div>
-            
+
             <div className="text-xs text-slate-500 space-y-3 leading-relaxed">
               <p>
                 Once submitted, your self-assessment will be frozen and sent for manager evaluation.
@@ -559,7 +554,7 @@ export const MyKpis: React.FC = () => {
               >
                 Cancel
               </button>
-              
+
               <button
                 type="button"
                 onClick={handleSubmitAssessment}

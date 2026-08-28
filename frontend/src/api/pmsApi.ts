@@ -35,5 +35,8 @@ export const pmsApi = {
   getHistory: async (): Promise<PmsHistory[]> => {
     const response = await apiClient.get<PmsHistory[]>('/employee/pms/history');
     return response.data;
+  },
+  resetActiveCycle: async (): Promise<void> => {
+    await apiClient.post('/employee/pms/reset-active');
   }
 };

@@ -1,169 +1,334 @@
 package com.aseuro.pms.controller;
 
-import com.aseuro.pms.dto.CreateEmployeeRequest;
-import com.aseuro.pms.dto.DepartmentDto;
-import com.aseuro.pms.dto.DesignationDto;
-import com.aseuro.pms.dto.EmployeeDto;
-import com.aseuro.pms.dto.ManagerOptionDto;
-import com.aseuro.pms.entity.Department;
-import com.aseuro.pms.entity.Designation;
-import com.aseuro.pms.entity.Employee;
-import com.aseuro.pms.entity.RecordStatus;
-import com.aseuro.pms.entity.User;
-import com.aseuro.pms.entity.UserRole;
+import com.aseuro.pms.dto.*;
 import com.aseuro.pms.exception.ApiException;
-import com.aseuro.pms.repository.DepartmentRepository;
-import com.aseuro.pms.repository.DesignationRepository;
-import com.aseuro.pms.repository.EmployeeRepository;
-import com.aseuro.pms.repository.UserRepository;
+import com.aseuro.pms.model.*;
+import com.aseuro.pms.repository.*;
+import com.aseuro.pms.security.UserPrincipal;
+import com.aseuro.pms.service.HrKpiService;
+import com.aseuro.pms.service.HrLifecycleService;
+import com.aseuro.pms.service.ReportService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.Map;
+import java.io.IOException;
+import java.time.LocalDate;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/hr")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('HR')")
+@PreAuthorize("hasAnyRole('HR', 'ROLE_HR')")
 public class HrManagementController {
 
-    private final UserRepository userRepository;
     private final EmployeeRepository employeeRepository;
-    private final DepartmentRepository departmentRepository;
-    private final DesignationRepository designationRepository;
+    private final PmsAssignmentRepository pmsAssignmentRepository;
+    private final PmsKpiRepository pmsKpiRepository;
+    private final KpiMasterRepository kpiMasterRepository;
     private final PasswordEncoder passwordEncoder;
+    private final HrKpiService hrKpiService;
+    private final HrLifecycleService hrLifecycleService;
+    private final ReportService reportService;
 
-    @GetMapping("/departments")
-    public ResponseEntity<List<DepartmentDto>> getDepartments() {
-        List<DepartmentDto> list = departmentRepository.findByStatus(RecordStatus.ACTIVE).stream()
-                .map(d -> new DepartmentDto(d.getId(), d.getName(), d.getDescription(), d.getStatus().name()))
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(list);
+    // 1. Dashboard Overview Stats
+    @GetMapping("/dashboard")
+    public ResponseEntity<HrDashboardStatsDto> getDashboardStats() {
+        List<Employee> allEmployees = employeeRepository.findAll();
+        long totalEmp = allEmployees.stream().filter(e -> e.getRole() == Role.ROLE_EMPLOYEE).count();
+        long totalMgr = allEmployees.stream().filter(e -> e.getRole() == Role.ROLE_MANAGER).count();
+        long totalDesig = hrKpiService.getAllDesignations().size();
+
+        List<PmsAssignment> assignments = pmsAssignmentRepository.findAll();
+        long completed = assignments.stream().filter(a -> a.getStatus() == PMSState.COMPLETED || a.getStatus() == PMSState.FINAL_RESULT_PUBLISHED).count();
+        long pendingSelf = assignments.stream().filter(a -> a.getStatus() == PMSState.PMS_STARTED || a.getStatus() == PMSState.SELF_ASSESSMENT_DRAFT).count();
+        long pendingMgr = assignments.stream().filter(a -> a.getStatus() == PMSState.SELF_ASSESSMENT_SUBMITTED || a.getStatus() == PMSState.MANAGER_REVIEW_PENDING).count();
+        long pendingHr = assignments.stream().filter(a -> a.getStatus() == PMSState.MANAGER_REVIEW_SUBMITTED || a.getStatus() == PMSState.HR_REVIEW_PENDING).count();
+
+        HrDashboardStatsDto stats = HrDashboardStatsDto.builder()
+                .totalEmployees(totalEmp)
+                .totalManagers(totalMgr)
+                .totalDesignations(totalDesig)
+                .completedCycles(completed)
+                .pendingSelfAssessments(pendingSelf)
+                .pendingManagerReviews(pendingMgr)
+                .pendingHrReviews(pendingHr)
+                .build();
+
+        return ResponseEntity.ok(stats);
     }
 
+    // 2. Designation List
     @GetMapping("/designations")
-    public ResponseEntity<List<DesignationDto>> getDesignations() {
-        List<DesignationDto> list = designationRepository.findByStatus(RecordStatus.ACTIVE).stream()
-                .map(d -> new DesignationDto(d.getId(), d.getName(), d.getDescription(), d.getStatus().name()))
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(list);
+    public ResponseEntity<List<Map<String, Object>>> getDesignations() {
+        List<String> list = hrKpiService.getAllDesignations();
+        List<Map<String, Object>> result = new ArrayList<>();
+        long id = 1;
+        for (String d : list) {
+            result.add(Map.of("id", id++, "name", d, "description", d + " Role Profile"));
+        }
+        return ResponseEntity.ok(result);
     }
 
+    // 3. Manager Options for Dropdown & List
     @GetMapping("/managers")
     public ResponseEntity<List<ManagerOptionDto>> getManagers() {
-        List<Employee> managers = employeeRepository.findByUserRoleAndStatus(UserRole.MANAGER, RecordStatus.ACTIVE);
-        Map<Long, String> designationMap = designationRepository.findAll().stream()
-                .collect(Collectors.toMap(Designation::getId, Designation::getName, (a, b) -> a));
+        List<Employee> managers = employeeRepository.findAll().stream()
+                .filter(e -> e.getRole() == Role.ROLE_MANAGER)
+                .collect(Collectors.toList());
 
         List<ManagerOptionDto> list = managers.stream()
                 .map(m -> new ManagerOptionDto(
                         m.getId(),
-                        m.getFullName(),
-                        m.getEmployeeCode(),
+                        m.getName(),
+                        "MGR-" + m.getId(),
                         m.getEmail(),
-                        m.getDesignationId() != null ? designationMap.getOrDefault(m.getDesignationId(), "Manager") : "Manager"
+                        m.getDesignation() != null ? m.getDesignation() : "Engineering Manager"
                 ))
                 .collect(Collectors.toList());
         return ResponseEntity.ok(list);
     }
 
+    // 4. Create Manager
+    @PostMapping("/managers")
+    @Transactional
+    public ResponseEntity<Map<String, Object>> createManager(@Valid @RequestBody CreateManagerRequest request) {
+        String email = request.getEmail().trim().toLowerCase();
+        if (employeeRepository.findByEmail(email).isPresent()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Email already exists in the system.");
+        }
+
+        Employee manager = Employee.builder()
+                .name(request.getName().trim())
+                .email(email)
+                .password(passwordEncoder.encode(request.getPassword()))
+                .department(request.getDepartment() != null ? request.getDepartment().trim() : "Engineering")
+                .team(request.getTeam() != null ? request.getTeam().trim() : "Core Team")
+                .designation(request.getDesignation() != null ? request.getDesignation().trim() : "Engineering Manager")
+                .joiningDate(request.getJoiningDate() != null ? request.getJoiningDate() : LocalDate.now())
+                .accountStatus("ACTIVE")
+                .role(Role.ROLE_MANAGER)
+                .build();
+
+        Employee saved = employeeRepository.save(manager);
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                "message", "Manager created successfully.",
+                "id", saved.getId(),
+                "name", saved.getName(),
+                "email", saved.getEmail()
+        ));
+    }
+
+    // 5. Employee Directory
     @GetMapping("/employees")
     public ResponseEntity<List<EmployeeDto>> getAllEmployees() {
         List<Employee> allEmployees = employeeRepository.findAll();
-        Map<Long, String> deptMap = departmentRepository.findAll().stream()
-                .collect(Collectors.toMap(Department::getId, Department::getName, (a, b) -> a));
-        Map<Long, String> desigMap = designationRepository.findAll().stream()
-                .collect(Collectors.toMap(Designation::getId, Designation::getName, (a, b) -> a));
-        Map<Long, String> empNameMap = allEmployees.stream()
-                .collect(Collectors.toMap(Employee::getId, Employee::getFullName, (a, b) -> a));
 
         List<EmployeeDto> dtoList = allEmployees.stream()
-                .map(e -> new EmployeeDto(
-                        e.getId(),
-                        e.getUser() != null ? e.getUser().getId() : null,
-                        e.getEmployeeCode(),
-                        e.getFullName(),
-                        e.getEmail(),
-                        e.getUser() != null ? e.getUser().getRole().name() : "EMPLOYEE",
-                        e.getDepartmentId(),
-                        e.getDepartmentId() != null ? deptMap.getOrDefault(e.getDepartmentId(), "-") : "-",
-                        e.getDesignationId(),
-                        e.getDesignationId() != null ? desigMap.getOrDefault(e.getDesignationId(), "-") : "-",
-                        e.getManagerId(),
-                        e.getManagerId() != null ? empNameMap.getOrDefault(e.getManagerId(), "-") : "-",
-                        e.getJoiningDate(),
-                        e.getStatus().name(),
-                        e.getCreatedAt()
-                ))
+                .map(e -> EmployeeDto.builder()
+                        .id(e.getId())
+                        .employeeCode("EMP-" + e.getId())
+                        .name(e.getName())
+                        .email(e.getEmail())
+                        .role(e.getRole() != null ? e.getRole().name().replace("ROLE_", "") : "EMPLOYEE")
+                        .department(e.getDepartment() != null ? e.getDepartment() : "-")
+                        .designation(e.getDesignation() != null ? e.getDesignation() : "-")
+                        .team(e.getTeam() != null ? e.getTeam() : "-")
+                        .managerId(e.getManager() != null ? e.getManager().getId() : null)
+                        .managerName(e.getManager() != null ? e.getManager().getName() : "-")
+                        .joiningDate(e.getJoiningDate())
+                        .accountStatus(e.getAccountStatus() != null ? e.getAccountStatus() : "ACTIVE")
+                        .build()
+                )
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(dtoList);
     }
 
+    // 6. Create Employee (with Auto KPI Assignment)
     @PostMapping("/employees")
     @Transactional
-    public ResponseEntity<Map<String, Object>> createEmployee(@Valid @RequestBody CreateEmployeeRequest request) {
-        String email = request.email().trim().toLowerCase();
-        String employeeCode = request.employeeCode().trim();
+    public ResponseEntity<Map<String, Object>> createEmployee(@RequestBody CreateEmployeeRequest request) {
+        String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
+        String name = request.getEffectiveName();
 
-        if (userRepository.existsByEmailIgnoreCase(email) || employeeRepository.existsByEmailIgnoreCase(email)) {
+        if (email.isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Email address is required.");
+        }
+        if (request.getPassword() == null || request.getPassword().trim().isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Password is required.");
+        }
+
+        if (employeeRepository.findByEmail(email).isPresent()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Email already exists in the system.");
         }
 
-        if (employeeRepository.existsByEmployeeCodeIgnoreCase(employeeCode)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Employee Code already exists.");
-        }
-
-        // Validate manager role if managerId specified
-        if (request.managerId() != null) {
-            Employee manager = employeeRepository.findById(request.managerId())
+        Employee reportingManager = null;
+        if (request.getManagerId() != null) {
+            reportingManager = employeeRepository.findById(request.getManagerId())
                     .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "Selected reporting manager does not exist."));
-            if (manager.getUser() == null || manager.getUser().getRole() != UserRole.MANAGER) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "Reporting Manager must have MANAGER role.");
-            }
         }
 
-        // 1. Create User
-        User user = new User();
-        user.setEmail(email);
-        user.setUsername(email.split("@")[0]);
-        user.setPasswordHash(passwordEncoder.encode(request.password()));
-        user.setRole(request.role());
-        user.setStatus(RecordStatus.ACTIVE);
-        User savedUser = userRepository.save(user);
+        Role role = Role.ROLE_EMPLOYEE;
+        if (request.getRole() != null && (request.getRole().equalsIgnoreCase("MANAGER") || request.getRole().equalsIgnoreCase("ROLE_MANAGER"))) {
+            role = Role.ROLE_MANAGER;
+        }
 
-        // 2. Create Employee Profile
-        Employee employee = new Employee();
-        employee.setUser(savedUser);
-        employee.setEmployeeCode(employeeCode);
-        employee.setFullName(request.fullName().trim());
-        employee.setEmail(email);
-        employee.setDepartmentId(request.departmentId());
-        employee.setDesignationId(request.designationId());
-        employee.setTeamId(request.teamId());
-        employee.setManagerId(request.managerId());
-        employee.setJoiningDate(request.joiningDate());
-        employee.setStatus(RecordStatus.ACTIVE);
-        Employee savedEmp = employeeRepository.save(employee);
+        String designation = request.getDesignation();
+        if (designation == null || designation.trim().isEmpty()) {
+            designation = "Software Engineer";
+        }
+
+        String department = request.getDepartment();
+        if (department == null || department.trim().isEmpty()) {
+            department = "Engineering";
+        }
+
+        Employee employee = Employee.builder()
+                .name(name)
+                .email(email)
+                .password(passwordEncoder.encode(request.getPassword()))
+                .department(department.trim())
+                .team(request.getTeam() != null ? request.getTeam().trim() : "Core Platform")
+                .designation(designation.trim())
+                .manager(reportingManager)
+                .joiningDate(request.getJoiningDate() != null ? request.getJoiningDate() : LocalDate.now())
+                .accountStatus("ACTIVE")
+                .role(role)
+                .build();
+
+        Employee saved = employeeRepository.save(employee);
+
+        // Auto-assign active PMS cycle & clone KPIs from KpiMaster
+        PmsAssignment assignment = PmsAssignment.builder()
+                .employee(saved)
+                .cycleMonth("August 2026")
+                .status(PMSState.SELF_ASSESSMENT_DRAFT)
+                .startDate(LocalDate.of(2026, 8, 1))
+                .endDate(LocalDate.of(2026, 8, 31))
+                .submissionDeadline(LocalDate.of(2026, 9, 10))
+                .build();
+        pmsAssignmentRepository.save(assignment);
+
+        List<KpiMaster> masterKpis = kpiMasterRepository.findByDesignationIgnoreCaseAndStatus(designation.trim(), "ACTIVE");
+        if (masterKpis.isEmpty()) {
+            // Fallback to generic software engineer if designation not found
+            masterKpis = kpiMasterRepository.findByDesignationIgnoreCaseAndStatus("Software Engineer", "ACTIVE");
+        }
+
+        List<PmsKpi> assignedKpis = new ArrayList<>();
+        for (KpiMaster km : masterKpis) {
+            PmsKpi k = PmsKpi.builder()
+                    .assignment(assignment)
+                    .kpiName(km.getKpiName())
+                    .description(km.getDescription())
+                    .weightage(km.getWeightage())
+                    .build();
+            assignedKpis.add(k);
+        }
+        if (!assignedKpis.isEmpty()) {
+            pmsKpiRepository.saveAll(assignedKpis);
+        }
 
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
-                "message", "Account provisioned successfully for " + request.role() + ": " + request.fullName(),
-                "id", savedEmp.getId(),
-                "userId", savedUser.getId(),
-                "email", savedUser.getEmail(),
-                "role", savedUser.getRole().name()
+                "message", "Employee created and KPIs assigned successfully.",
+                "id", saved.getId(),
+                "name", saved.getName(),
+                "email", saved.getEmail(),
+                "designation", saved.getDesignation(),
+                "assignedKpisCount", assignedKpis.size()
         ));
+    }
+
+    // 7. KPI Master CRUD Endpoints
+    @GetMapping("/kpis")
+    public ResponseEntity<List<KpiMasterDto>> getKpiMasterList(@RequestParam(required = false) String designation) {
+        List<KpiMasterDto> list = hrKpiService.getKpisByDesignation(designation);
+        return ResponseEntity.ok(list);
+    }
+
+    @PostMapping("/kpis")
+    public ResponseEntity<KpiMasterDto> createKpi(@Valid @RequestBody CreateKpiMasterRequest request) {
+        KpiMasterDto created = hrKpiService.createKpi(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    @PutMapping("/kpis/{id}")
+    public ResponseEntity<KpiMasterDto> updateKpi(@PathVariable Long id, @Valid @RequestBody UpdateKpiMasterRequest request) {
+        KpiMasterDto updated = hrKpiService.updateKpi(id, request);
+        return ResponseEntity.ok(updated);
+    }
+
+    @DeleteMapping("/kpis/{id}")
+    public ResponseEntity<Void> deleteKpi(@PathVariable Long id) {
+        hrKpiService.deleteKpi(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    // 8. Lifecycle Search & Detail
+    @GetMapping("/lifecycle/employees")
+    public ResponseEntity<List<EmployeeDto>> searchLifecycleEmployees(@RequestParam(required = false) String query) {
+        List<EmployeeDto> list = hrLifecycleService.searchEmployees(query);
+        return ResponseEntity.ok(list);
+    }
+
+    @GetMapping("/lifecycle/{employeeId}")
+    public ResponseEntity<Map<String, Object>> getLifecycleDetail(@PathVariable Long employeeId) {
+        Map<String, Object> data = hrLifecycleService.getEmployeeLifecycle(employeeId);
+        return ResponseEntity.ok(data);
+    }
+
+    // 9. HR Finalise and Submit
+    @PostMapping("/lifecycle/{assignmentId}/finalize")
+    public ResponseEntity<Map<String, Object>> finalizePms(
+            @PathVariable Long assignmentId,
+            @RequestBody HrFinalizeRequest request,
+            @AuthenticationPrincipal UserPrincipal hrUser) {
+        Map<String, Object> result = hrLifecycleService.finalizePms(assignmentId, hrUser.getId(), request);
+        return ResponseEntity.ok(result);
+    }
+
+    // 10. Reports Summary
+    @GetMapping("/reports/summary")
+    public ResponseEntity<HrReportSummaryDto> getReportsSummary() {
+        HrReportSummaryDto summary = hrLifecycleService.getRatingCategorySummary();
+        return ResponseEntity.ok(summary);
+    }
+
+    // 11. Reports Download
+    @GetMapping("/reports/download")
+    public ResponseEntity<byte[]> downloadReport(
+            @RequestParam Long assignmentId,
+            @RequestParam(defaultValue = "pdf") String format,
+            @AuthenticationPrincipal UserPrincipal hrUser) throws IOException {
+
+        byte[] data;
+        String filename;
+        MediaType mediaType;
+
+        if ("excel".equalsIgnoreCase(format)) {
+            data = reportService.generateExcelReport(hrUser.getId(), assignmentId);
+            filename = "HR_PMS_Report_" + assignmentId + ".xlsx";
+            mediaType = MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        } else {
+            data = reportService.generatePdfReport(hrUser.getId(), assignmentId);
+            filename = "HR_PMS_Report_" + assignmentId + ".pdf";
+            mediaType = MediaType.APPLICATION_PDF;
+        }
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(mediaType)
+                .body(data);
     }
 }

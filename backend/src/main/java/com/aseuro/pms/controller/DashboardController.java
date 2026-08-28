@@ -2,7 +2,7 @@ package com.aseuro.pms.controller;
 
 import com.aseuro.pms.entity.Employee;
 import com.aseuro.pms.entity.User;
-import com.aseuro.pms.repository.EmployeeRepository;
+import com.aseuro.pms.repository.HrEmployeeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,9 +20,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DashboardController {
 
-    private final EmployeeRepository employeeRepository;
+    private final HrEmployeeRepository employeeRepository;
 
-    @GetMapping("/hr/dashboard")
+    @GetMapping("/legacy/hr/dashboard")
     @PreAuthorize("hasRole('HR')")
     public ResponseEntity<Map<String, Object>> hrDashboard(@AuthenticationPrincipal User principal) {
         long totalEmployees = employeeRepository.count();
@@ -35,7 +35,7 @@ public class DashboardController {
         ));
     }
 
-    @GetMapping("/manager/dashboard")
+    @GetMapping("/legacy/manager/dashboard")
     @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<Map<String, Object>> managerDashboard(@AuthenticationPrincipal User principal) {
         Employee manager = employeeRepository.findByUserId(principal.getId()).orElse(null);
@@ -61,7 +61,7 @@ public class DashboardController {
         ));
     }
 
-    @GetMapping("/employee/dashboard")
+    @GetMapping("/legacy/employee/dashboard")
     @PreAuthorize("hasRole('EMPLOYEE')")
     public ResponseEntity<Map<String, Object>> employeeDashboard(@AuthenticationPrincipal User principal) {
         Employee employee = employeeRepository.findByUserId(principal.getId()).orElse(null);

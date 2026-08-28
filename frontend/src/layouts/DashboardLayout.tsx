@@ -9,7 +9,11 @@ import {
   LogOut,
   Menu,
   X,
-  ChevronRight
+  ChevronRight,
+  UserPlus,
+  Users,
+  UserCheck,
+  RefreshCw
 } from 'lucide-react';
 
 interface SidebarItemProps {
@@ -45,17 +49,43 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard size={22} /> },
-    { name: 'My KPIs', href: '/kpis', icon: <Target size={22} /> },
-    { name: 'My Reports', href: '/reports', icon: <FileText size={22} /> },
-    { name: 'My Profile', href: '/profile', icon: <User size={22} /> },
+  const isHr = user?.role === 'ROLE_HR' || user?.role === 'HR';
+  const isManager = user?.role === 'ROLE_MANAGER' || user?.role === 'MANAGER';
+
+  const employeeNavigation = [
+    { name: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard size={20} /> },
+    { name: 'My KPIs', href: '/kpis', icon: <Target size={20} /> },
+    { name: 'My Reports', href: '/reports', icon: <FileText size={20} /> },
+    { name: 'My Profile', href: '/profile', icon: <User size={20} /> },
   ];
+
+  const managerNavigation = [
+    { name: 'Dashboard', href: '/manager/dashboard', icon: <LayoutDashboard size={20} /> },
+    { name: 'View My KPIs', href: '/manager/my-kpis', icon: <Target size={20} /> },
+    { name: 'View New Employees Assigned', href: '/manager/employees', icon: <Users size={20} /> },
+    { name: 'Reports', href: '/manager/reports', icon: <FileText size={20} /> },
+  ];
+
+  const hrNavigation = [
+    { name: 'Dashboard', href: '/hr/dashboard', icon: <LayoutDashboard size={20} /> },
+    { name: 'Add Employee', href: '/hr/employees/add', icon: <UserPlus size={20} /> },
+    { name: 'Employee Directory', href: '/hr/employees', icon: <Users size={20} /> },
+    { name: 'Add/Edit Managers', href: '/hr/managers', icon: <UserCheck size={20} /> },
+    { name: 'Add/Edit KPIs', href: '/hr/kpis', icon: <Target size={20} /> },
+    { name: 'PMS Lifecycle', href: '/hr/pms-lifecycle', icon: <RefreshCw size={20} /> },
+    { name: 'Generate Reports', href: '/hr/reports', icon: <FileText size={20} /> },
+  ];
+
+  const navigation = isHr ? hrNavigation : isManager ? managerNavigation : employeeNavigation;
+  const portalTitle = isHr ? 'HR Portal' : isManager ? 'Manager Portal' : 'PMS Portal';
+  const headerContextTitle = isHr ? 'HR Administration' : isManager ? 'Manager Administration' : 'Employee Portal';
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
+
+  const currentNav = navigation.find(n => n.href === location.pathname);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
@@ -64,26 +94,27 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         {/* Brand Header */}
         <div className="h-18 md:h-20 flex items-center px-6 border-b border-slate-100 bg-white">
           <div className="flex items-center space-x-3.5">
-            {/* Minimal Logo */}
             <div className="w-10 h-10 rounded-xl bg-pms-green flex items-center justify-center text-white font-bold text-xl shadow-sm">
               P
             </div>
             <div>
               <span className="font-bold text-pms-gray text-xl tracking-tight">ASEURO</span>
-              <span className="text-xs text-pms-green font-bold block -mt-1 tracking-wider uppercase">PMS Portal</span>
+              <span className="text-xs text-pms-green font-bold block -mt-1 tracking-wider uppercase">
+                {portalTitle}
+              </span>
             </div>
           </div>
         </div>
 
         {/* Sidebar Nav */}
-        <nav className="flex-1 px-4 py-6 space-y-2">
+        <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
           {navigation.map((item) => (
             <SidebarItem
               key={item.name}
               to={item.href}
               icon={item.icon}
               label={item.name}
-              active={location.pathname === item.href}
+              active={location.pathname === item.href || location.pathname.startsWith(item.href + '/')}
             />
           ))}
         </nav>
@@ -91,19 +122,25 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         {/* User Card & Logout */}
         <div className="p-4 border-t border-slate-100">
           <div className="flex items-center space-x-3.5 p-3 rounded-xl bg-slate-50 border border-slate-100 mb-3">
-            <div className="w-10 h-10 rounded-full bg-pms-green/20 flex items-center justify-center font-bold text-pms-darkGreen uppercase shadow-inner text-sm shrink-0">
-              {user?.name ? user.name.charAt(0) : 'U'}
-            </div>
+            {user?.profilePhoto ? (
+              <img src={user.profilePhoto} alt="Profile" className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0" />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-pms-green/20 flex items-center justify-center font-bold text-pms-darkGreen uppercase shadow-inner text-sm shrink-0">
+                {user?.name ? user.name.charAt(0) : isHr ? 'H' : isManager ? 'M' : 'U'}
+              </div>
+            )}
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-pms-gray truncate">{user?.name || 'User'}</p>
-              <p className="text-xs text-slate-500 truncate capitalize">{user?.role?.replace('ROLE_', '').toLowerCase() || 'Employee'}</p>
+              <p className="text-sm font-bold text-pms-gray truncate">{user?.name || (isHr ? 'HR Administrator' : isManager ? 'Manager' : 'User')}</p>
+              <p className="text-xs text-slate-500 truncate capitalize font-medium">
+                {isHr ? 'HR Administrator' : isManager ? 'Reporting Manager' : 'Employee'}
+              </p>
             </div>
           </div>
           <button
             onClick={handleLogout}
             className="flex items-center space-x-3 w-full px-4 py-3 rounded-xl text-rose-600 hover:bg-rose-50 transition-colors duration-200 text-sm font-semibold"
           >
-            <LogOut size={20} />
+            <LogOut size={18} />
             <span>Logout</span>
           </button>
         </div>
@@ -117,7 +154,9 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
           </div>
           <div>
             <span className="font-bold text-pms-gray tracking-tight">ASEURO</span>
-            <span className="text-[10px] text-pms-green font-bold ml-1.5 uppercase">PMS Portal</span>
+            <span className="text-[10px] text-pms-green font-bold ml-1.5 uppercase">
+              {portalTitle}
+            </span>
           </div>
         </div>
         <button
@@ -140,40 +179,46 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
                 </div>
                 <div>
                   <span className="font-bold text-pms-gray text-lg tracking-tight">ASEURO</span>
-                  <span className="text-xs text-pms-green font-bold block -mt-1 uppercase">PMS Portal</span>
+                  <span className="text-xs text-pms-green font-bold block -mt-1 uppercase">
+                    {portalTitle}
+                  </span>
                 </div>
               </div>
               <button onClick={() => setMobileMenuOpen(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500">
                 <X size={20} />
               </button>
             </div>
-            <nav className="flex-1 px-4 py-6 space-y-2">
+            <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
               {navigation.map((item) => (
                 <SidebarItem
                   key={item.name}
                   to={item.href}
                   icon={item.icon}
                   label={item.name}
-                  active={location.pathname === item.href}
+                  active={location.pathname === item.href || location.pathname.startsWith(item.href + '/')}
                   onClick={() => setMobileMenuOpen(false)}
                 />
               ))}
             </nav>
             <div className="p-4 border-t border-slate-100 bg-slate-50">
               <div className="flex items-center space-x-3.5 mb-3 p-2 rounded-lg bg-white border border-slate-150">
-                <div className="w-10 h-10 rounded-full bg-pms-green/20 flex items-center justify-center font-bold text-pms-darkGreen uppercase shadow-inner text-sm shrink-0">
-                  {user?.name ? user.name.charAt(0) : 'U'}
-                </div>
+                {user?.profilePhoto ? (
+                  <img src={user.profilePhoto} alt="Profile" className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0" />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-pms-green/20 flex items-center justify-center font-bold text-pms-darkGreen uppercase shadow-inner text-sm shrink-0">
+                    {user?.name ? user.name.charAt(0) : isHr ? 'H' : isManager ? 'M' : 'U'}
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-pms-gray truncate">{user?.name || 'User'}</p>
-                  <p className="text-xs text-slate-500 uppercase truncate">{user?.role?.replace('ROLE_', '') || 'Employee'}</p>
+                  <p className="text-sm font-bold text-pms-gray truncate">{user?.name || (isHr ? 'HR Administrator' : isManager ? 'Manager' : 'User')}</p>
+                  <p className="text-xs text-slate-500 uppercase truncate">{isHr ? 'HR' : isManager ? 'MANAGER' : 'EMPLOYEE'}</p>
                 </div>
               </div>
               <button
                 onClick={handleLogout}
                 className="flex items-center space-x-3 w-full px-4 py-3 rounded-xl text-rose-600 hover:bg-rose-50 transition-colors duration-200 text-sm font-semibold"
               >
-                <LogOut size={20} />
+                <LogOut size={18} />
                 <span>Logout</span>
               </button>
             </div>
@@ -187,19 +232,23 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         <header className="hidden md:flex h-18 md:h-20 bg-white border-b border-slate-200 items-center justify-between px-6 lg:px-10 shrink-0">
           <div>
             <h1 className="text-slate-500 font-medium text-sm flex items-center space-x-1.5">
-              <span>Employee Portal</span>
+              <span>{headerContextTitle}</span>
               <ChevronRight size={14} className="text-slate-300" />
-              <span className="text-slate-800 font-semibold">{navigation.find(n => n.href === location.pathname)?.name || 'Portal'}</span>
+              <span className="text-slate-800 font-semibold">{currentNav?.name || 'Dashboard'}</span>
             </h1>
           </div>
           <div className="flex items-center space-x-4">
             <div className="flex flex-col text-right">
-              <span className="text-sm font-bold text-pms-gray">{user?.name || 'User'}</span>
-              <span className="text-xs text-slate-400 capitalize font-medium">{user?.role?.replace('ROLE_', '').toLowerCase() || 'Employee'}</span>
+              <span className="text-sm font-bold text-pms-gray">{user?.name || (isHr ? 'Bob HR' : isManager ? 'Alice Smith' : 'User')}</span>
+              <span className="text-xs text-slate-400 capitalize font-medium">{isHr ? 'HR Administrator' : isManager ? 'Reporting Manager' : 'Employee'}</span>
             </div>
-            <div className="w-10 h-10 rounded-full bg-pms-green text-white flex items-center justify-center font-bold text-sm shadow-sm border-2 border-white">
-              {user?.name ? user.name.substring(0, 2).toUpperCase() : 'US'}
-            </div>
+            {user?.profilePhoto ? (
+              <img src={user.profilePhoto} alt="Profile" className="w-10 h-10 rounded-full object-cover border-2 border-pms-green shadow-sm" />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-pms-green text-white flex items-center justify-center font-bold text-sm shadow-sm border-2 border-white">
+                {user?.name ? user.name.substring(0, 2).toUpperCase() : isHr ? 'HR' : isManager ? 'MG' : 'US'}
+              </div>
+            )}
           </div>
         </header>
 

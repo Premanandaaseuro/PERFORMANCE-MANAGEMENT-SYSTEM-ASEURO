@@ -4,6 +4,7 @@ import { User } from '../types';
 export interface LoginCredentials {
   email: string;
   password: string;
+  role?: string;
 }
 
 export const authApi = {

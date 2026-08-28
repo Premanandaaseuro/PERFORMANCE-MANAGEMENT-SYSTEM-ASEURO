@@ -10,24 +10,14 @@
 
     /* Bundler mode */
     "moduleResolution": "bundler",
-<<<<<<< HEAD
     "verbatimModuleSyntax": false,
-=======
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
->>>>>>> 7e242a5ead40c3cafff0fc936fda8630cb8d09d3
     "moduleDetection": "force",
     "noEmit": true,
     "jsx": "react-jsx",
 
     /* Linting */
-<<<<<<< HEAD
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-=======
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
->>>>>>> 7e242a5ead40c3cafff0fc936fda8630cb8d09d3
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },

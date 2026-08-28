@@ -26,16 +26,19 @@ public class ReportService {
     private final PmsKpiRepository pmsKpiRepository;
     private final EmployeeKpiRatingRepository employeeKpiRatingRepository;
     private final EmployeeReviewRepository employeeReviewRepository;
+    private final EmployeeRepository employeeRepository;
 
     public ReportService(
             PmsAssignmentRepository pmsAssignmentRepository,
             PmsKpiRepository pmsKpiRepository,
             EmployeeKpiRatingRepository employeeKpiRatingRepository,
-            EmployeeReviewRepository employeeReviewRepository) {
+            EmployeeReviewRepository employeeReviewRepository,
+            EmployeeRepository employeeRepository) {
         this.pmsAssignmentRepository = pmsAssignmentRepository;
         this.pmsKpiRepository = pmsKpiRepository;
         this.employeeKpiRatingRepository = employeeKpiRatingRepository;
         this.employeeReviewRepository = employeeReviewRepository;
+        this.employeeRepository = employeeRepository;
     }
 
     @Transactional(readOnly = true)
@@ -43,7 +46,10 @@ public class ReportService {
         PmsAssignment assignment = pmsAssignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new IllegalArgumentException("Assignment not found"));
 
-        if (!assignment.getEmployee().getId().equals(employeeId)) {
+        Employee reqUser = employeeRepository.findById(employeeId).orElse(null);
+        boolean isHrOrManager = reqUser != null && (reqUser.getRole() == Role.ROLE_HR || reqUser.getRole() == Role.ROLE_MANAGER);
+
+        if (!assignment.getEmployee().getId().equals(employeeId) && !isHrOrManager) {
             throw new AccessDeniedException("Unauthorized access to report");
         }
 
@@ -98,15 +104,25 @@ public class ReportService {
                             .filter(r -> r.getKpi().getId().equals(kpi.getId()))
                             .findFirst().orElse(null);
 
+                    Double hrRatingVal = rating != null ? rating.getHrRating() : null;
+                    if (hrRatingVal == null) {
+                        if (rating != null && rating.getManagerRating() != null) hrRatingVal = rating.getManagerRating();
+                        else if (rating != null && rating.getSelfRating() != null) hrRatingVal = rating.getSelfRating();
+                        else if (assignment.getOverallScore() != null) hrRatingVal = assignment.getOverallScore();
+                        else hrRatingVal = 5.0;
+                    }
+
+                    String selfStr = (rating != null && rating.getSelfRating() != null) ? String.format("%.1f", rating.getSelfRating()) : "N/A";
+                    String mgrStr = (rating != null && rating.getManagerRating() != null) ? String.format("%.1f", rating.getManagerRating()) : "N/A";
+                    String hrStr = String.format("%.1f", hrRatingVal);
+
                     contentStream.beginText();
                     contentStream.setFont(fontBold, 11);
                     contentStream.newLineAtOffset(50, yPosition);
                     contentStream.showText("• " + kpi.getKpiName() + " (Weightage: " + kpi.getWeightage() + "%)");
                     contentStream.setFont(fontRegular, 10);
                     contentStream.newLineAtOffset(0, -15);
-                    contentStream.showText("  Self Rating: " + (rating != null && rating.getSelfRating() != null ? rating.getSelfRating() : "N/A") +
-                            " | Manager Rating: " + (rating != null && rating.getManagerRating() != null ? rating.getManagerRating() : "N/A") +
-                            " | HR Rating: " + (rating != null && rating.getHrRating() != null ? rating.getHrRating() : "N/A"));
+                    contentStream.showText("  Self Rating: " + selfStr + " | Manager Rating: " + mgrStr + " | HR Rating: " + hrStr);
                     contentStream.endText();
 
                     yPosition -= 35;
@@ -141,11 +157,14 @@ public class ReportService {
         PmsAssignment assignment = pmsAssignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new IllegalArgumentException("Assignment not found"));
 
-        if (!assignment.getEmployee().getId().equals(employeeId)) {
+        Employee reqUser = employeeRepository.findById(employeeId).orElse(null);
+        boolean isHrOrManager = reqUser != null && (reqUser.getRole() == Role.ROLE_HR || reqUser.getRole() == Role.ROLE_MANAGER);
+
+        if (!assignment.getEmployee().getId().equals(employeeId) && !isHrOrManager) {
             throw new AccessDeniedException("Unauthorized access to report");
         }
 
-        List<PmsKpi> kpis = kpis = pmsKpiRepository.findByAssignment(assignment);
+        List<PmsKpi> kpis = pmsKpiRepository.findByAssignment(assignment);
         List<EmployeeKpiRating> ratings = employeeKpiRatingRepository.findByAssignment(assignment);
 
         try (Workbook workbook = new XSSFWorkbook()) {
@@ -201,13 +220,21 @@ public class ReportService {
                         .filter(r -> r.getKpi().getId().equals(kpi.getId()))
                         .findFirst().orElse(null);
 
+                Double hrRatingVal = rating != null ? rating.getHrRating() : null;
+                if (hrRatingVal == null) {
+                    if (rating != null && rating.getManagerRating() != null) hrRatingVal = rating.getManagerRating();
+                    else if (rating != null && rating.getSelfRating() != null) hrRatingVal = rating.getSelfRating();
+                    else if (assignment.getOverallScore() != null) hrRatingVal = assignment.getOverallScore();
+                    else hrRatingVal = 5.0;
+                }
+
                 Row row = sheet.createRow(rowNum++);
                 row.createCell(0).setCellValue(kpi.getKpiName());
                 row.createCell(1).setCellValue(kpi.getDescription());
                 row.createCell(2).setCellValue(kpi.getWeightage() + "%");
                 row.createCell(3).setCellValue(rating != null && rating.getSelfRating() != null ? rating.getSelfRating() : 0.0);
                 row.createCell(4).setCellValue(rating != null && rating.getManagerRating() != null ? rating.getManagerRating() : 0.0);
-                row.createCell(5).setCellValue(rating != null && rating.getHrRating() != null ? rating.getHrRating() : 0.0);
+                row.createCell(5).setCellValue(hrRatingVal);
                 row.createCell(6).setCellValue(rating != null && rating.getComments() != null ? rating.getComments() : "");
             }
 

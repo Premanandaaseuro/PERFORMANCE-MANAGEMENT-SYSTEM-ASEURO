@@ -7,8 +7,11 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
+import java.util.Optional;
+
 @Repository
 public interface PmsHistoryRepository extends JpaRepository<PmsHistory, Long> {
     List<PmsHistory> findByEmployee(Employee employee);
     List<PmsHistory> findByEmployeeOrderByCycleMonthDesc(Employee employee);
+    Optional<PmsHistory> findFirstByAssignmentId(Long assignmentId);
 }

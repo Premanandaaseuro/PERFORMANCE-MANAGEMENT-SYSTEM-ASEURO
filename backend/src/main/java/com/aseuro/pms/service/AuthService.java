@@ -7,7 +7,7 @@ import com.aseuro.pms.entity.Employee;
 import com.aseuro.pms.entity.RecordStatus;
 import com.aseuro.pms.entity.User;
 import com.aseuro.pms.exception.ApiException;
-import com.aseuro.pms.repository.EmployeeRepository;
+import com.aseuro.pms.repository.HrEmployeeRepository;
 import com.aseuro.pms.repository.UserRepository;
 import com.aseuro.pms.security.JwtService;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +27,7 @@ public class AuthService {
     private static final int MAX_FAILED_ATTEMPTS = 5;
 
     private final UserRepository userRepository;
-    private final EmployeeRepository employeeRepository;
+    private final HrEmployeeRepository employeeRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 

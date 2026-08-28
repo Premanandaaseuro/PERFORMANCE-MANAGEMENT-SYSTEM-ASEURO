@@ -1,25 +1,8 @@
 package com.aseuro.pms.config;
 
-<<<<<<< HEAD
 import com.aseuro.pms.model.*;
 import com.aseuro.pms.repository.*;
 import org.springframework.boot.CommandLineRunner;
-=======
-import com.aseuro.pms.entity.Department;
-import com.aseuro.pms.entity.Designation;
-import com.aseuro.pms.entity.Employee;
-import com.aseuro.pms.entity.RecordStatus;
-import com.aseuro.pms.entity.User;
-import com.aseuro.pms.entity.UserRole;
-import com.aseuro.pms.repository.DepartmentRepository;
-import com.aseuro.pms.repository.DesignationRepository;
-import com.aseuro.pms.repository.EmployeeRepository;
-import com.aseuro.pms.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.ApplicationArguments;
-import org.springframework.boot.ApplicationRunner;
->>>>>>> 7e242a5ead40c3cafff0fc936fda8630cb8d09d3
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,7 +11,6 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Component
-<<<<<<< HEAD
 public class DatabaseSeeder implements CommandLineRunner {
 
     private final EmployeeRepository employeeRepository;
@@ -38,6 +20,7 @@ public class DatabaseSeeder implements CommandLineRunner {
     private final EmployeeReviewRepository employeeReviewRepository;
     private final FinalPmsResultRepository finalPmsResultRepository;
     private final PmsHistoryRepository pmsHistoryRepository;
+    private final KpiMasterRepository kpiMasterRepository;
     private final PasswordEncoder passwordEncoder;
 
     public DatabaseSeeder(
@@ -48,6 +31,7 @@ public class DatabaseSeeder implements CommandLineRunner {
             EmployeeReviewRepository employeeReviewRepository,
             FinalPmsResultRepository finalPmsResultRepository,
             PmsHistoryRepository pmsHistoryRepository,
+            KpiMasterRepository kpiMasterRepository,
             PasswordEncoder passwordEncoder) {
         this.employeeRepository = employeeRepository;
         this.pmsAssignmentRepository = pmsAssignmentRepository;
@@ -56,20 +40,43 @@ public class DatabaseSeeder implements CommandLineRunner {
         this.employeeReviewRepository = employeeReviewRepository;
         this.finalPmsResultRepository = finalPmsResultRepository;
         this.pmsHistoryRepository = pmsHistoryRepository;
+        this.kpiMasterRepository = kpiMasterRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
     @Override
     @Transactional
     public void run(String... args) throws Exception {
+        seedKpiMasterData();
+
         if (employeeRepository.count() > 0) {
-            return; // Database already seeded
+            // Ensure HR user exists with correct password Hr@12345
+            employeeRepository.findByEmail("hr@aseuro.com").ifPresent(hr -> {
+                hr.setPassword(passwordEncoder.encode("Hr@12345"));
+                hr.setRole(Role.ROLE_HR);
+                employeeRepository.save(hr);
+            });
+
+            // Ensure August 2026 active assignments have the 12 standard KPIs
+            List<PmsAssignment> activeAssignments = pmsAssignmentRepository.findAll();
+            for (PmsAssignment a : activeAssignments) {
+                if ("August 2026".equals(a.getCycleMonth())) {
+                    List<PmsKpi> currentKpis = pmsKpiRepository.findByAssignment(a);
+                    boolean has12 = currentKpis.stream().anyMatch(k -> "Sprint Task Completion".equalsIgnoreCase(k.getKpiName()));
+                    if (!has12) {
+                        employeeKpiRatingRepository.deleteAll(employeeKpiRatingRepository.findByAssignment(a));
+                        pmsKpiRepository.deleteAll(currentKpis);
+                        create12StandardKpisForAssignment(a);
+                    }
+                }
+            }
+            return;
         }
 
         // 1. Create Users
         Employee hr = Employee.builder()
                 .email("hr@aseuro.com")
-                .password(passwordEncoder.encode("password"))
+                .password(passwordEncoder.encode("Hr@12345"))
                 .name("Bob HR")
                 .department("Human Resources")
                 .designation("HR Director")
@@ -98,7 +105,7 @@ public class DatabaseSeeder implements CommandLineRunner {
                 .name("John Doe")
                 .department("Engineering")
                 .team("Core Platform")
-                .designation("Senior Software Engineer")
+                .designation("Software Engineer")
                 .manager(manager)
                 .joiningDate(LocalDate.of(2023, 3, 10))
                 .accountStatus("ACTIVE")
@@ -106,52 +113,31 @@ public class DatabaseSeeder implements CommandLineRunner {
                 .build();
         employeeRepository.save(employee);
 
-        // 2. Seed active PMS Cycle (August 2026)
+        // 2. Create Active PMS Assignment for Manager (Alice Smith) for August 2026
+        PmsAssignment managerAssignment = PmsAssignment.builder()
+                .employee(manager)
+                .cycleMonth("August 2026")
+                .status(PMSState.SELF_ASSESSMENT_DRAFT)
+                .startDate(LocalDate.of(2026, 8, 1))
+                .endDate(LocalDate.of(2026, 8, 31))
+                .submissionDeadline(LocalDate.of(2026, 8, 25))
+                .build();
+        pmsAssignmentRepository.save(managerAssignment);
+        create12StandardKpisForAssignment(managerAssignment);
+
+        // Create Active PMS Assignment for Employee (John Doe) for August 2026 (Fresh Self-Assessment Draft)
         PmsAssignment currentAssignment = PmsAssignment.builder()
                 .employee(employee)
                 .cycleMonth("August 2026")
-                .status(PMSState.PMS_STARTED)
+                .status(PMSState.SELF_ASSESSMENT_DRAFT)
                 .startDate(LocalDate.of(2026, 8, 1))
                 .endDate(LocalDate.of(2026, 8, 31))
-                .submissionDeadline(LocalDate.of(2026, 9, 10))
+                .submissionDeadline(LocalDate.of(2026, 8, 25))
                 .build();
         pmsAssignmentRepository.save(currentAssignment);
+        create12StandardKpisForAssignment(currentAssignment);
 
-        PmsKpi kpi1 = PmsKpi.builder()
-                .assignment(currentAssignment)
-                .kpiName("Code Quality")
-                .description("Maintain code quality, test coverage, and reduce production defects.")
-                .weightage(20.0)
-                .build();
-        PmsKpi kpi2 = PmsKpi.builder()
-                .assignment(currentAssignment)
-                .kpiName("Delivery & Speed")
-                .description("Deliver sprint tasks within estimation timelines with minimal spillover.")
-                .weightage(40.0)
-                .build();
-        PmsKpi kpi3 = PmsKpi.builder()
-                .assignment(currentAssignment)
-                .kpiName("Communication & Collaboration")
-                .description("Collaborate effectively with cross-functional teams and maintain clear updates.")
-                .weightage(20.0)
-                .build();
-        PmsKpi kpi4 = PmsKpi.builder()
-                .assignment(currentAssignment)
-                .kpiName("Innovation & Optimization")
-                .description("Propose and implement performance optimizations or developer workflow tooling.")
-                .weightage(20.0)
-                .build();
-        pmsKpiRepository.saveAll(List.of(kpi1, kpi2, kpi3, kpi4));
-
-        // Create empty ratings template
-        EmployeeKpiRating r1 = EmployeeKpiRating.builder().assignment(currentAssignment).kpi(kpi1).status("PENDING").build();
-        EmployeeKpiRating r2 = EmployeeKpiRating.builder().assignment(currentAssignment).kpi(kpi2).status("PENDING").build();
-        EmployeeKpiRating r3 = EmployeeKpiRating.builder().assignment(currentAssignment).kpi(kpi3).status("PENDING").build();
-        EmployeeKpiRating r4 = EmployeeKpiRating.builder().assignment(currentAssignment).kpi(kpi4).status("PENDING").build();
-        employeeKpiRatingRepository.saveAll(List.of(r1, r2, r3, r4));
-
-
-        // 3. Seed Finalized History Records (July 2026)
+        // 3. Seed history (July 2026)
         PmsAssignment julyAssignment = PmsAssignment.builder()
                 .employee(employee)
                 .cycleMonth("July 2026")
@@ -164,38 +150,38 @@ public class DatabaseSeeder implements CommandLineRunner {
                 .build();
         pmsAssignmentRepository.save(julyAssignment);
 
-        PmsKpi jkpi1 = PmsKpi.builder().assignment(julyAssignment).kpiName("Code Quality").description("Maintain code quality.").weightage(25.0).build();
-        PmsKpi jkpi2 = PmsKpi.builder().assignment(julyAssignment).kpiName("Delivery & Speed").description("Sprint goals delivery.").weightage(50.0).build();
-        PmsKpi jkpi3 = PmsKpi.builder().assignment(julyAssignment).kpiName("Teamwork").description("Effective team communication.").weightage(25.0).build();
-        pmsKpiRepository.saveAll(List.of(jkpi1, jkpi2, jkpi3));
+        PmsKpi julyKpi1 = PmsKpi.builder()
+                .assignment(julyAssignment)
+                .kpiName("Sprint Goal Achievement")
+                .description("Successfully completed all assigned sprint goals.")
+                .weightage(40.0)
+                .build();
+        pmsKpiRepository.save(julyKpi1);
 
-        EmployeeKpiRating jr1 = EmployeeKpiRating.builder()
-                .assignment(julyAssignment).kpi(jkpi1).selfRating(4.0).managerRating(4.5).hrRating(4.5)
-                .comments("Achieved 85% test coverage in core module").status("COMPLETED").build();
-        EmployeeKpiRating jr2 = EmployeeKpiRating.builder()
-                .assignment(julyAssignment).kpi(jkpi2).selfRating(4.0).managerRating(4.0).hrRating(4.0)
-                .comments("Completed all core features in July release").status("COMPLETED").build();
-        EmployeeKpiRating jr3 = EmployeeKpiRating.builder()
-                .assignment(julyAssignment).kpi(jkpi3).selfRating(4.5).managerRating(4.5).hrRating(4.5)
-                .comments("Conducted onboarding sessions for new hires").status("COMPLETED").build();
-        employeeKpiRatingRepository.saveAll(List.of(jr1, jr2, jr3));
+        EmployeeKpiRating julyRating1 = EmployeeKpiRating.builder()
+                .assignment(julyAssignment)
+                .kpi(julyKpi1)
+                .selfRating(4.5)
+                .comments("Delivered high performance features ahead of deadlines.")
+                .build();
+        employeeKpiRatingRepository.save(julyRating1);
 
-        EmployeeReview jReview = EmployeeReview.builder()
+        EmployeeReview julyReview = EmployeeReview.builder()
                 .assignment(julyAssignment)
                 .reviewer(manager)
-                .comments("John performed exceptionally well this month. His contribution to the testing suite was major.")
-                .reviewDate(LocalDate.of(2026, 7, 27))
+                .comments("Exceptional velocity and dependable work throughout July.")
+                .reviewDate(LocalDate.of(2026, 7, 26))
                 .build();
-        employeeReviewRepository.save(jReview);
+        employeeReviewRepository.save(julyReview);
 
-        FinalPmsResult jResult = FinalPmsResult.builder()
+        FinalPmsResult julyResult = FinalPmsResult.builder()
                 .assignment(julyAssignment)
                 .finalScore(4.25)
                 .grade("Excellent Performance")
                 .finalizedBy(hr)
                 .finalizedDate(LocalDate.of(2026, 7, 28))
                 .build();
-        finalPmsResultRepository.save(jResult);
+        finalPmsResultRepository.save(julyResult);
 
         PmsHistory julyHistory = PmsHistory.builder()
                 .employee(employee)
@@ -252,161 +238,57 @@ public class DatabaseSeeder implements CommandLineRunner {
                 .assignmentId(mayAssignment.getId())
                 .build();
         pmsHistoryRepository.save(mayHistory);
-=======
-@RequiredArgsConstructor
-@Slf4j
-public class DatabaseSeeder implements ApplicationRunner {
-
-    private final UserRepository userRepository;
-    private final EmployeeRepository employeeRepository;
-    private final DepartmentRepository departmentRepository;
-    private final DesignationRepository designationRepository;
-    private final PasswordEncoder passwordEncoder;
-
-    @Override
-    @Transactional
-    public void run(ApplicationArguments args) {
-        log.info("Checking and seeding initial PMS database records...");
-
-        // 1. Seed Departments
-        seedDepartments();
-
-        // 2. Seed Designations
-        seedDesignations();
-
-        // 3. Seed Primary HR User (aishwarya.logaraj@aseuro.in)
-        seedHrUser();
-
-        // 4. Seed Initial Manager & Employee for testing login
-        seedInitialManagerAndEmployee();
-
-        log.info("Database seeding completed successfully.");
     }
 
-    private void seedDepartments() {
-        List<String> defaultDepts = List.of(
-                "Engineering",
-                "Human Resources",
-                "Sales & Marketing",
-                "Product & Design",
-                "Finance & Operations"
+    private void create12StandardKpisForAssignment(PmsAssignment assignment) {
+        List<PmsKpi> kpis = List.of(
+                PmsKpi.builder().assignment(assignment).kpiName("Sprint Task Completion").description("Sprint Task Completion - tasks completed within sprint (individual)").weightage(10.0).build(),
+                PmsKpi.builder().assignment(assignment).kpiName("Deadline Adherence").description("Deadline Adherence - tasks completed on or before deadline").weightage(15.0).build(),
+                PmsKpi.builder().assignment(assignment).kpiName("Task Quality with Defects").description("Task Quality with Defects - tasks delivered without defects, including reopen and critical issues").weightage(10.0).build(),
+                PmsKpi.builder().assignment(assignment).kpiName("Prompt Quality").description("Prompt Quality - AI tasks with minimal rework").weightage(15.0).build(),
+                PmsKpi.builder().assignment(assignment).kpiName("Jira Time Logging").description("Jira Time Logging - days logged properly in Jira").weightage(10.0).build(),
+                PmsKpi.builder().assignment(assignment).kpiName("Jira Discipline").description("Jira Discipline - status updates, comments, transitions, and ticket hygiene").weightage(5.0).build(),
+                PmsKpi.builder().assignment(assignment).kpiName("Accountability & Ownership").description("Accountability & Ownership - proactive ownership, updates, issue handling, team collaboration, and engagement").weightage(10.0).build(),
+                PmsKpi.builder().assignment(assignment).kpiName("Leave Pattern").description("Leave Pattern - planned leaves should be 95% of total leaves; unplanned leaves should not exceed 5% in a year including sick leave; sick leave every month for more than two days requires a medical certificate").weightage(5.0).build(),
+                PmsKpi.builder().assignment(assignment).kpiName("Team Collaboration and Engagement").description("Team Collaboration and Engagement").weightage(5.0).build(),
+                PmsKpi.builder().assignment(assignment).kpiName("Punctuality").description("Punctuality").weightage(5.0).build(),
+                PmsKpi.builder().assignment(assignment).kpiName("New Initiatives and Participation").description("New Initiatives and Participation").weightage(5.0).build(),
+                PmsKpi.builder().assignment(assignment).kpiName("Rewards").description("Rewards").weightage(5.0).build()
         );
-        for (String name : defaultDepts) {
-            if (departmentRepository.findByNameIgnoreCase(name).isEmpty()) {
-                Department dept = new Department(name, name + " Department");
-                departmentRepository.save(dept);
-                log.info("Seeded department: {}", name);
-            }
-        }
+        pmsKpiRepository.saveAll(kpis);
     }
 
-    private void seedDesignations() {
-        List<String> defaultDesignations = List.of(
-                "Engineering Manager",
-                "Senior Software Engineer",
+    private void seedKpiMasterData() {
+        boolean hasNewKpis = kpiMasterRepository.findAll().stream()
+                .anyMatch(k -> "Sprint Task Completion".equalsIgnoreCase(k.getKpiName()));
+
+        if (hasNewKpis && kpiMasterRepository.count() > 0) {
+            return;
+        }
+
+        kpiMasterRepository.deleteAll();
+
+        List<String> designations = List.of(
                 "Software Engineer",
-                "Associate Software Engineer",
-                "HR Lead",
-                "HR Executive",
-                "Product Manager",
-                "UI/UX Designer",
+                "Senior Software Engineer",
+                "Tech Lead",
+                "Engineering Manager",
                 "QA Engineer"
         );
-        for (String name : defaultDesignations) {
-            if (designationRepository.findByNameIgnoreCase(name).isEmpty()) {
-                Designation designation = new Designation(name, name + " Role");
-                designationRepository.save(designation);
-                log.info("Seeded designation: {}", name);
-            }
+
+        for (String des : designations) {
+            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Sprint Task Completion").description("Sprint Task Completion - tasks completed within sprint (individual)").weightage(10.0).build());
+            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Deadline Adherence").description("Deadline Adherence - tasks completed on or before deadline").weightage(15.0).build());
+            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Task Quality with Defects").description("Task Quality with Defects - tasks delivered without defects, including reopen and critical issues").weightage(10.0).build());
+            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Prompt Quality").description("Prompt Quality - AI tasks with minimal rework").weightage(15.0).build());
+            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Jira Time Logging").description("Jira Time Logging - days logged properly in Jira").weightage(10.0).build());
+            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Jira Discipline").description("Jira Discipline - status updates, comments, transitions, and ticket hygiene").weightage(5.0).build());
+            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Accountability & Ownership").description("Accountability & Ownership - proactive ownership, updates, issue handling, team collaboration, and engagement").weightage(10.0).build());
+            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Leave Pattern").description("Leave Pattern - planned leaves should be 95% of total leaves; unplanned leaves should not exceed 5% in a year including sick leave; sick leave every month for more than two days requires a medical certificate").weightage(5.0).build());
+            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Team Collaboration and Engagement").description("Team Collaboration and Engagement").weightage(5.0).build());
+            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Punctuality").description("Punctuality").weightage(5.0).build());
+            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("New Initiatives and Participation").description("New Initiatives and Participation").weightage(5.0).build());
+            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Rewards").description("Rewards").weightage(5.0).build());
         }
-    }
-
-    private void seedHrUser() {
-        String hrEmail = "aishwarya.logaraj@aseuro.in";
-        if (userRepository.findByEmailIgnoreCase(hrEmail).isEmpty()) {
-            User hrUser = new User();
-            hrUser.setUsername("aishwarya.logaraj");
-            hrUser.setEmail(hrEmail);
-            hrUser.setPasswordHash(passwordEncoder.encode("Aseuro@123"));
-            hrUser.setRole(UserRole.HR);
-            hrUser.setStatus(RecordStatus.ACTIVE);
-            User savedUser = userRepository.save(hrUser);
-
-            // Also create employee profile for HR
-            Department hrDept = departmentRepository.findByNameIgnoreCase("Human Resources").orElse(null);
-            Designation hrRole = designationRepository.findByNameIgnoreCase("HR Lead").orElse(null);
-
-            Employee hrEmp = new Employee();
-            hrEmp.setUser(savedUser);
-            hrEmp.setEmployeeCode("HR-001");
-            hrEmp.setFullName("Aishwarya Logaraj");
-            hrEmp.setEmail(hrEmail);
-            if (hrDept != null) hrEmp.setDepartmentId(hrDept.getId());
-            if (hrRole != null) hrEmp.setDesignationId(hrRole.getId());
-            hrEmp.setJoiningDate(LocalDate.of(2023, 1, 15));
-            hrEmp.setStatus(RecordStatus.ACTIVE);
-            employeeRepository.save(hrEmp);
-
-            log.info("Provisioned HR Administrator account: {}", hrEmail);
-        }
-    }
-
-    private void seedInitialManagerAndEmployee() {
-        Department engDept = departmentRepository.findByNameIgnoreCase("Engineering").orElse(null);
-        Designation mgrDesig = designationRepository.findByNameIgnoreCase("Engineering Manager").orElse(null);
-        Designation sdeDesig = designationRepository.findByNameIgnoreCase("Software Engineer").orElse(null);
-
-        // 1. Seed Manager
-        String mgrEmail = "manager@aseuro.in";
-        Employee savedMgr = null;
-        if (userRepository.findByEmailIgnoreCase(mgrEmail).isEmpty()) {
-            User mgrUser = new User();
-            mgrUser.setUsername("rajesh.manager");
-            mgrUser.setEmail(mgrEmail);
-            mgrUser.setPasswordHash(passwordEncoder.encode("Manager@123"));
-            mgrUser.setRole(UserRole.MANAGER);
-            mgrUser.setStatus(RecordStatus.ACTIVE);
-            User saved = userRepository.save(mgrUser);
-
-            Employee mgrEmp = new Employee();
-            mgrEmp.setUser(saved);
-            mgrEmp.setEmployeeCode("MGR-101");
-            mgrEmp.setFullName("Rajesh Sharma");
-            mgrEmp.setEmail(mgrEmail);
-            if (engDept != null) mgrEmp.setDepartmentId(engDept.getId());
-            if (mgrDesig != null) mgrEmp.setDesignationId(mgrDesig.getId());
-            mgrEmp.setJoiningDate(LocalDate.of(2022, 6, 1));
-            mgrEmp.setStatus(RecordStatus.ACTIVE);
-            savedMgr = employeeRepository.save(mgrEmp);
-            log.info("Provisioned Manager account: {}", mgrEmail);
-        } else {
-            savedMgr = employeeRepository.findByEmailIgnoreCase(mgrEmail).orElse(null);
-        }
-
-        // 2. Seed Employee
-        String empEmail = "employee@aseuro.in";
-        if (userRepository.findByEmailIgnoreCase(empEmail).isEmpty()) {
-            User empUser = new User();
-            empUser.setUsername("kiran.employee");
-            empUser.setEmail(empEmail);
-            empUser.setPasswordHash(passwordEncoder.encode("Employee@123"));
-            empUser.setRole(UserRole.EMPLOYEE);
-            empUser.setStatus(RecordStatus.ACTIVE);
-            User saved = userRepository.save(empUser);
-
-            Employee emp = new Employee();
-            emp.setUser(saved);
-            emp.setEmployeeCode("EMP-201");
-            emp.setFullName("Kiran Kumar");
-            emp.setEmail(empEmail);
-            if (engDept != null) emp.setDepartmentId(engDept.getId());
-            if (sdeDesig != null) emp.setDesignationId(sdeDesig.getId());
-            if (savedMgr != null) emp.setManagerId(savedMgr.getId());
-            emp.setJoiningDate(LocalDate.of(2024, 2, 10));
-            emp.setStatus(RecordStatus.ACTIVE);
-            employeeRepository.save(emp);
-            log.info("Provisioned Employee account: {}", empEmail);
-        }
->>>>>>> 7e242a5ead40c3cafff0fc936fda8630cb8d09d3
     }
 }

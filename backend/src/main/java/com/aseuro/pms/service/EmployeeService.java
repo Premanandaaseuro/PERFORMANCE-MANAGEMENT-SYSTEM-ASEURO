@@ -24,6 +24,25 @@ public class EmployeeService {
         return convertToDto(emp);
     }
 
+    @Transactional
+    public EmployeeDto updateProfile(Long employeeId, com.aseuro.pms.dto.UpdateProfileRequest request) {
+        Employee emp = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new UsernameNotFoundException("Employee not found with id: " + employeeId));
+
+        if (request.getName() != null && !request.getName().trim().isEmpty()) {
+            emp.setName(request.getName().trim());
+        }
+        if (request.getPhone() != null) {
+            emp.setPhone(request.getPhone().trim());
+        }
+        if (request.getProfilePhoto() != null) {
+            emp.setProfilePhoto(request.getProfilePhoto());
+        }
+
+        Employee saved = employeeRepository.save(emp);
+        return convertToDto(saved);
+    }
+
     public EmployeeDto convertToDto(Employee emp) {
         return EmployeeDto.builder()
                 .id(emp.getId())
@@ -35,6 +54,8 @@ public class EmployeeService {
                 .managerName(emp.getManager() != null ? emp.getManager().getName() : "N/A")
                 .joiningDate(emp.getJoiningDate())
                 .accountStatus(emp.getAccountStatus())
+                .phone(emp.getPhone())
+                .profilePhoto(emp.getProfilePhoto())
                 .build();
     }
 }
