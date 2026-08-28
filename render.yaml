@@ -1,0 +1,48 @@
+services:
+  # 1. PostgreSQL Database (Free Tier)
+  - type: postgres
+    name: pms-postgres
+    env: docker
+    plan: free
+    ipAllowList: []
+    databaseName: pms_db
+    user: postgres
+
+  # 2. Java Spring Boot Backend Service (Free Tier)
+  - type: web
+    name: pms-backend
+    env: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    envVars:
+      - key: DB_HOST
+        fromDatabase:
+          name: pms-postgres
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: pms-postgres
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: pms-postgres
+          property: database
+      - key: DB_USERNAME
+        fromDatabase:
+          name: pms-postgres
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: pms-postgres
+          property: password
+      - key: SERVER_PORT
+        value: 8081
+
+  # 3. Vite React Frontend Service (Free Tier)
+  - type: web
+    name: pms-frontend
+    env: docker
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    plan: free
