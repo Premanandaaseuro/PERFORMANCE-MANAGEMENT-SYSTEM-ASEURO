@@ -250,60 +250,6 @@ public class HrManagementController {
         ));
     }
 
-    // Update Employee (Promote to Manager, Change Designation, Department, Manager)
-    @PutMapping("/employees/{id}")
-    @Transactional
-    public ResponseEntity<Map<String, Object>> updateEmployee(@PathVariable Long id, @RequestBody UpdateEmployeeRequest request) {
-        Employee employee = employeeRepository.findById(id)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Employee not found."));
-
-        if (request.getEffectiveName() != null) {
-            employee.setName(request.getEffectiveName());
-        }
-        if (request.getDesignation() != null && !request.getDesignation().trim().isEmpty()) {
-            employee.setDesignation(request.getDesignation().trim());
-        }
-        if (request.getDepartment() != null && !request.getDepartment().trim().isEmpty()) {
-            employee.setDepartment(request.getDepartment().trim());
-        }
-        if (request.getTeam() != null && !request.getTeam().trim().isEmpty()) {
-            employee.setTeam(request.getTeam().trim());
-        }
-        if (request.getAccountStatus() != null && !request.getAccountStatus().trim().isEmpty()) {
-            employee.setAccountStatus(request.getAccountStatus().trim());
-        }
-        if (request.getRole() != null) {
-            String roleStr = request.getRole().trim().toUpperCase();
-            if (roleStr.contains("MANAGER")) {
-                employee.setRole(Role.ROLE_MANAGER);
-            } else if (roleStr.contains("HR")) {
-                employee.setRole(Role.ROLE_HR);
-            } else {
-                employee.setRole(Role.ROLE_EMPLOYEE);
-            }
-        }
-        if (request.getManagerId() != null) {
-            if (request.getManagerId() == 0 || request.getManagerId() == -1) {
-                employee.setManager(null);
-            } else {
-                Employee mgr = employeeRepository.findById(request.getManagerId())
-                        .orElse(null);
-                employee.setManager(mgr);
-            }
-        }
-
-        Employee saved = employeeRepository.save(employee);
-
-        return ResponseEntity.ok(Map.of(
-                "message", "Employee updated successfully.",
-                "id", saved.getId(),
-                "name", saved.getName(),
-                "role", saved.getRole().name().replace("ROLE_", ""),
-                "designation", saved.getDesignation() != null ? saved.getDesignation() : "-",
-                "department", saved.getDepartment() != null ? saved.getDepartment() : "-"
-        ));
-    }
-
     // 7. KPI Master CRUD Endpoints
     @GetMapping("/kpis")
     public ResponseEntity<List<KpiMasterDto>> getKpiMasterList(@RequestParam(required = false) String designation) {

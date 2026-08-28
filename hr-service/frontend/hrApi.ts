@@ -43,22 +43,6 @@ export const hrApi = {
     return response.data;
   },
 
-  updateEmployee: async (
-    id: number,
-    data: {
-      name?: string;
-      role?: string;
-      designation?: string;
-      department?: string;
-      team?: string;
-      managerId?: number | null;
-      accountStatus?: string;
-    }
-  ): Promise<{ message: string; id: number }> => {
-    const response = await apiClient.put<{ message: string; id: number }>(`/api/hr/employees/${id}`, data);
-    return response.data;
-  },
-
   getKpiMasterList: async (designation?: string): Promise<KpiMasterItem[]> => {
     const response = await apiClient.get<KpiMasterItem[]>('/api/hr/kpis', {
       params: designation ? { designation } : {}

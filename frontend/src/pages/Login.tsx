@@ -1,7 +1,19 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Target, Lock, Mail, AlertCircle, ArrowRight, ShieldCheck, UserCheck, Users } from 'lucide-react';
+import aseuroLogo from '../assets/aseuro-logo.png';
+import {
+  Mail,
+  Lock,
+  ArrowRight,
+  Target,
+  BarChart3,
+  Sprout,
+  AlertCircle,
+  UserCheck,
+  Users,
+  ShieldCheck
+} from 'lucide-react';
 
 export const Login: React.FC = () => {
   const { login } = useAuth();
@@ -9,6 +21,7 @@ export const Login: React.FC = () => {
   const [role, setRole] = useState<'EMPLOYEE' | 'MANAGER' | 'HR'>('EMPLOYEE');
   const [email, setEmail] = useState('employee@aseuro.com');
   const [password, setPassword] = useState('password');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -57,7 +70,7 @@ export const Login: React.FC = () => {
       } else if (err.message) {
         setError(err.message);
       } else {
-        setError('Invalid credentials. Please try again.');
+        setError('Invalid credentials. Please check your email and password.');
       }
     } finally {
       setLoading(false);
@@ -65,191 +78,231 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div
-      className="min-h-screen bg-pms-gray flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-cover bg-center relative"
-      style={{ backgroundImage: "linear-gradient(rgba(58, 58, 58, 0.95), rgba(58, 58, 58, 0.98))" }}
-    >
-      {/* Background Graphic Accents */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-pms-green/5 rounded-full filter blur-3xl -z-10"></div>
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-pms-darkGreen/5 rounded-full filter blur-3xl -z-10"></div>
-
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center">
-          <div className="w-14 h-14 rounded-xl bg-pms-green flex items-center justify-center text-white shadow-lg shadow-pms-green/20 ring-4 ring-pms-green/10">
-            <Target size={28} />
-          </div>
-        </div>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-white tracking-tight">
-          ASEURO Performance Management
-        </h2>
-        <p className="mt-2 text-center text-sm text-slate-400">
-          Enter your corporate credentials to sign in
-        </p>
+    <div className="min-h-screen w-full bg-gradient-to-br from-[#f2faf3] via-[#f8fcf8] to-[#e8f5ea] relative overflow-hidden flex items-center justify-center font-sans">
+      {/* Decorative Dot Matrix Background */}
+      <div className="absolute top-10 left-[47%] -translate-x-1/2 grid grid-cols-4 gap-3 opacity-60 pointer-events-none z-0">
+        {Array.from({ length: 16 }).map((_, i) => (
+          <span key={i} className="w-1.5 h-1.5 rounded-full bg-emerald-500 opacity-70" />
+        ))}
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow-2xl sm:rounded-xl sm:px-10 border border-slate-100">
-          
-          {/* Role Selection Tabs */}
-          <div className="mb-6">
-            <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2 text-center">
-              Select Login Role
-            </label>
-            <div className="grid grid-cols-3 gap-2 bg-slate-100 p-1 rounded-xl">
-              <button
-                type="button"
-                onClick={() => handleRoleChange('EMPLOYEE')}
-                className={`flex items-center justify-center space-x-1.5 py-2 text-xs font-bold rounded-lg transition-all ${
-                  role === 'EMPLOYEE'
-                    ? 'bg-white text-pms-darkGreen shadow-sm border border-slate-200/60'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <UserCheck size={14} />
-                <span>Employee</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleRoleChange('MANAGER')}
-                className={`flex items-center justify-center space-x-1.5 py-2 text-xs font-bold rounded-lg transition-all ${
-                  role === 'MANAGER'
-                    ? 'bg-white text-pms-darkGreen shadow-sm border border-slate-200/60'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <Users size={14} />
-                <span>Manager</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleRoleChange('HR')}
-                className={`flex items-center justify-center space-x-1.5 py-2 text-xs font-bold rounded-lg transition-all ${
-                  role === 'HR'
-                    ? 'bg-white text-pms-darkGreen shadow-sm border border-slate-200/60'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <ShieldCheck size={14} />
-                <span>HR</span>
-              </button>
-            </div>
+      {/* Main Layout Grid */}
+      <div className="max-w-[1240px] w-full mx-auto px-6 py-8 md:py-12 grid grid-cols-1 lg:grid-cols-12 items-center gap-12 relative z-10">
+        
+        {/* Left Hero Section */}
+        <div className="lg:col-span-7 flex flex-col space-y-8 pr-0 lg:pr-6">
+          {/* Logo Header */}
+          <div className="flex items-center space-x-3">
+            <img src={aseuroLogo} alt="Aseuro Logo" className="w-12 h-12 object-contain filter drop-shadow-sm" />
+            <span className="text-3xl font-black tracking-tight text-slate-900">aseuro</span>
           </div>
 
-          <form className="space-y-5" onSubmit={handleSubmit}>
-            {error && (
-              <div className="bg-rose-50 border-l-4 border-rose-500 p-4 rounded-md flex items-start space-x-3 animate-slideIn">
-                <AlertCircle className="text-rose-600 shrink-0 mt-0.5" size={18} />
-                <span className="text-xs text-rose-800 font-semibold">{error}</span>
-              </div>
-            )}
+          {/* Hero Headings */}
+          <div className="space-y-3">
+            <h1 className="text-4xl sm:text-5xl lg:text-[3.6rem] font-black text-slate-900 leading-[1.08] tracking-tight">
+              Performance<br />
+              Management<br />
+              <span className="text-emerald-600 inline-block">Simplified</span>
+            </h1>
+            <div className="w-12 h-1.5 bg-emerald-600 rounded-full" />
+            <p className="text-slate-600 text-base leading-relaxed max-w-lg pt-2 font-medium">
+              A centralized platform to manage goals, reviews, feedback and drive continuous growth.
+            </p>
+          </div>
 
-            <div>
-              <label htmlFor="email" className="block text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                {role === 'HR' ? 'HR Corporate Email' : 'Corporate Email Address'}
-              </label>
-              <div className="mt-1.5 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Mail size={18} />
-                </div>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-lg text-sm text-pms-gray placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-pms-green/50 focus:border-pms-green transition-all"
-                  placeholder={role === 'HR' ? 'hr@aseuro.com' : 'employee@aseuro.com'}
-                />
+          {/* 3 Feature Cards */}
+          <div className="space-y-4 max-w-md pt-2">
+            {/* Feature 1 */}
+            <div className="flex items-center space-x-4 bg-white/95 backdrop-blur-sm p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition-all duration-200">
+              <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                <Target size={22} />
+              </div>
+              <div>
+                <h4 className="text-sm font-extrabold text-slate-900">Set Goals</h4>
+                <p className="text-xs text-slate-500 font-medium">Define clear goals and align with your vision.</p>
               </div>
             </div>
 
-            <div>
-              <label htmlFor="password" className="block text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                Security Password
-              </label>
-              <div className="mt-1.5 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Lock size={18} />
-                </div>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-lg text-sm text-pms-gray placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-pms-green/50 focus:border-pms-green transition-all"
-                  placeholder="••••••••"
-                />
+            {/* Feature 2 */}
+            <div className="flex items-center space-x-4 bg-white/95 backdrop-blur-sm p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition-all duration-200">
+              <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                <BarChart3 size={22} />
+              </div>
+              <div>
+                <h4 className="text-sm font-extrabold text-slate-900">Track Progress</h4>
+                <p className="text-xs text-slate-500 font-medium">Monitor performance and measure what matters.</p>
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input
-                  id="remember-me"
-                  name="remember-me"
-                  type="checkbox"
-                  defaultChecked
-                  className="h-4 w-4 text-pms-green focus:ring-pms-green border-slate-300 rounded"
-                />
-                <label htmlFor="remember-me" className="ml-2 block text-xs text-slate-500 font-medium">
-                  Remember session
-                </label>
+            {/* Feature 3 */}
+            <div className="flex items-center space-x-4 bg-white/95 backdrop-blur-sm p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition-all duration-200">
+              <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                <Sprout size={22} />
               </div>
+              <div>
+                <h4 className="text-sm font-extrabold text-slate-900">Drive Growth</h4>
+                <p className="text-xs text-slate-500 font-medium">Provide feedback and grow together continuously.</p>
+              </div>
+            </div>
+          </div>
+        </div>
 
-              <div className="text-xs">
+        {/* Right Card Section */}
+        <div className="lg:col-span-5 flex justify-center">
+          <div className="bg-white rounded-[32px] w-full max-w-[440px] p-8 sm:p-10 shadow-2xl shadow-slate-900/10 border border-slate-200/80 flex flex-col items-center relative z-10">
+            
+            {/* Card Logo Header */}
+            <div className="flex items-center space-x-2.5 mb-1">
+              <img src={aseuroLogo} alt="Aseuro Logo" className="w-10 h-10 object-contain filter drop-shadow-xs" />
+              <span className="text-2xl font-black tracking-tight text-slate-900">aseuro</span>
+            </div>
+
+            {/* Title */}
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-4 text-center">
+              Welcome Back!
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-500 mt-1 mb-6 text-center font-medium">
+              Sign in to access your account
+            </p>
+
+            {/* Quick Role Switcher */}
+            <div className="w-full mb-5">
+              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 text-center">
+                Select Login Role
+              </label>
+              <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
                 <button
                   type="button"
-                  onClick={() => alert("Please contact your HR administrator to initiate password recovery.")}
-                  className="font-semibold text-pms-green hover:text-pms-darkGreen"
+                  onClick={() => handleRoleChange('EMPLOYEE')}
+                  className={`flex items-center justify-center space-x-1 py-2 text-xs font-bold rounded-xl transition-all ${
+                    role === 'EMPLOYEE'
+                      ? 'bg-white text-emerald-700 shadow-sm border border-slate-200/80'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
                 >
-                  Forgot password?
+                  <UserCheck size={14} />
+                  <span>Employee</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleRoleChange('MANAGER')}
+                  className={`flex items-center justify-center space-x-1 py-2 text-xs font-bold rounded-xl transition-all ${
+                    role === 'MANAGER'
+                      ? 'bg-white text-emerald-700 shadow-sm border border-slate-200/80'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <Users size={14} />
+                  <span>Manager</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleRoleChange('HR')}
+                  className={`flex items-center justify-center space-x-1 py-2 text-xs font-bold rounded-xl transition-all ${
+                    role === 'HR'
+                      ? 'bg-white text-emerald-700 shadow-sm border border-slate-200/80'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <ShieldCheck size={14} />
+                  <span>HR</span>
                 </button>
               </div>
             </div>
 
-            <div>
+            {/* Form */}
+            <form className="w-full space-y-4" onSubmit={handleSubmit}>
+              {/* Error Alert */}
+              {error && (
+                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 flex items-center space-x-2 text-xs font-semibold text-rose-800 animate-fadeIn">
+                  <AlertCircle size={16} className="text-rose-600 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {/* Email Input */}
+              <div>
+                <div className="relative flex items-center">
+                  <Mail size={18} className="absolute left-4 text-emerald-600 pointer-events-none" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email address"
+                    autoComplete="email"
+                    required
+                    className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Password Input */}
+              <div>
+                <div className="relative flex items-center">
+                  <Lock size={18} className="absolute left-4 text-amber-500 pointer-events-none" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    autoComplete="current-password"
+                    required
+                    className="w-full pl-11 pr-16 py-3.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 text-xs font-bold text-emerald-600 hover:text-emerald-700"
+                  >
+                    {showPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+                
+                <div className="text-right mt-2">
+                  <button
+                    type="button"
+                    onClick={() => alert('Default passwords:\n• HR: Hr@12345\n• Manager / Employee: password')}
+                    className="text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+              </div>
+
+              {/* Login Submit Button */}
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex justify-center items-center space-x-2 py-3 px-4 border border-transparent rounded-lg shadow-md text-sm font-semibold text-white bg-pms-green hover:bg-pms-darkGreen focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pms-green transition-colors disabled:opacity-50"
+                className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-bold text-sm shadow-lg shadow-emerald-600/30 transition-all transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-between disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none mt-2"
               >
-                <span>{loading ? 'Authenticating...' : `Sign In as ${role === 'HR' ? 'HR Administrator' : role === 'MANAGER' ? 'Manager' : 'Employee'}`}</span>
-                {!loading && <ArrowRight size={16} />}
+                <span className="mx-auto pl-4">
+                  {loading ? 'Authenticating...' : 'Login'}
+                </span>
+                <ArrowRight size={18} />
               </button>
-            </div>
-          </form>
+            </form>
 
-          {/* Seed accounts helper hint */}
-          <div className="mt-6 pt-5 border-t border-slate-100">
-            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Sample Account Credentials:</h4>
-            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200/50 space-y-1">
-              {role === 'HR' ? (
-                <>
-                  <p className="text-[11px] text-slate-500 font-medium"><strong className="text-pms-gray font-semibold">HR Email:</strong> hr@aseuro.com</p>
-                  <p className="text-[11px] text-slate-500 font-medium"><strong className="text-pms-gray font-semibold">Password:</strong> Hr@12345</p>
-                </>
-              ) : role === 'MANAGER' ? (
-                <>
-                  <p className="text-[11px] text-slate-500 font-medium"><strong className="text-pms-gray font-semibold">Manager Email:</strong> manager@aseuro.com</p>
-                  <p className="text-[11px] text-slate-500 font-medium"><strong className="text-pms-gray font-semibold">Password:</strong> password</p>
-                </>
-              ) : (
-                <>
-                  <p className="text-[11px] text-slate-500 font-medium"><strong className="text-pms-gray font-semibold">Employee Email:</strong> employee@aseuro.com</p>
-                  <p className="text-[11px] text-slate-500 font-medium"><strong className="text-pms-gray font-semibold">Password:</strong> password</p>
-                </>
-              )}
-            </div>
           </div>
-
         </div>
+      </div>
+
+      {/* Bottom Wave Vector Baseline */}
+      <div className="absolute bottom-0 left-0 right-0 h-28 pointer-events-none z-0 opacity-90 overflow-hidden">
+        <svg viewBox="0 0 1440 120" fill="none" preserveAspectRatio="none" className="w-full h-full">
+          <path
+            d="M0 60C320 120 640 10 960 50C1280 90 1440 30 1440 30V120H0V60Z"
+            fill="url(#bottom-wave-gradient-page)"
+          />
+          <defs>
+            <linearGradient id="bottom-wave-gradient-page" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#16a34a" />
+              <stop offset="100%" stopColor="#15803d" />
+            </linearGradient>
+          </defs>
+        </svg>
       </div>
     </div>
   );
 };
+
 export default Login;
