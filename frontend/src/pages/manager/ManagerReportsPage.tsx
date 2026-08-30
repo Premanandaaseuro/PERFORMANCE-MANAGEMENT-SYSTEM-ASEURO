@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { pmsApi } from '../../api/pmsApi';
 import { managerApi } from '../../api/managerApi';
-import { ManagerReportData, ManagerEmployeeItem } from '../../types';
+import { reportApi } from '../../api/reportApi';
+import { ManagerReportData, ManagerEmployeeItem, PmsHistory, PmsAssignment } from '../../types';
 import {
   FileText,
   Download,
@@ -11,10 +13,14 @@ import {
   AlertCircle,
   Users,
   Award,
-  Search
+  Search,
+  User,
+  Eye,
+  BarChart2
 } from 'lucide-react';
 
 export const ManagerReportsPage: React.FC = () => {
+  const [reportTab, setReportTab] = useState<'TEAM' | 'MY_RATINGS'>('TEAM');
   const [reportsData, setReportsData] = useState<ManagerReportData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,8 +31,13 @@ export const ManagerReportsPage: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
+  // Manager's own personal appraisal history state
+  const [myHistoryList, setMyHistoryList] = useState<PmsHistory[]>([]);
+  const [myCurrentAssignment, setMyCurrentAssignment] = useState<PmsAssignment | null>(null);
+
   useEffect(() => {
     fetchReports();
+    fetchMyPersonalRatings();
   }, []);
 
   const fetchReports = async () => {
@@ -40,6 +51,19 @@ export const ManagerReportsPage: React.FC = () => {
       setError('Unable to load team appraisal reports.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchMyPersonalRatings = async () => {
+    try {
+      const [hist, current] = await Promise.all([
+        pmsApi.getHistory().catch(() => []),
+        pmsApi.getCurrentAssignment().catch(() => null)
+      ]);
+      setMyHistoryList(hist);
+      setMyCurrentAssignment(current);
+    } catch (err) {
+      console.error('Failed to load manager personal ratings', err);
     }
   };
 
@@ -63,7 +87,7 @@ export const ManagerReportsPage: React.FC = () => {
     }
   };
 
-  const filteredEmployees = (reportsData?.assignedEmployees || []).filter((emp) => {
+  const filteredEmployees = (reportsData?.assignedEmployees || []).filter((emp: ManagerEmployeeItem) => {
     if (selectedEmployeeId !== 'ALL' && emp.id.toString() !== selectedEmployeeId) return false;
     if (selectedMonth !== 'ALL' && emp.cycleMonth !== selectedMonth) return false;
     if (selectedStatus !== 'ALL') {
@@ -82,7 +106,7 @@ export const ManagerReportsPage: React.FC = () => {
     return true;
   });
 
-  const uniqueMonths = Array.from(new Set((reportsData?.assignedEmployees || []).map(e => e.cycleMonth || 'August 2026')));
+  const uniqueMonths: string[] = Array.from(new Set((reportsData?.assignedEmployees || []).map((e: ManagerEmployeeItem) => e.cycleMonth || 'August 2026')));
 
   if (loading) {
     return (
@@ -97,19 +121,214 @@ export const ManagerReportsPage: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
+      {/* Header & Tab Toggle */}
       <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-6">
         <div>
           <div className="flex items-center space-x-2 text-xs font-bold text-purple-600 uppercase tracking-wider mb-2">
             <FileText size={16} />
-            <span>Team Analytics • Direct Reports Only</span>
+            <span>Manager Appraisal Center • Team & Self Analytics</span>
           </div>
-          <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">Team PMS Reports</h1>
+          <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">Appraisal & Rating Reports</h1>
           <p className="text-slate-500 text-sm mt-1">
-            Filter, inspect appraisal history, and download official performance reports for your direct reports.
+            Switch between direct report performance tracking and your own personal appraisal score history.
           </p>
         </div>
+
+        {/* Tab Switcher */}
+        <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200/80 shrink-0">
+          <button
+            onClick={() => setReportTab('TEAM')}
+            className={`flex items-center space-x-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              reportTab === 'TEAM'
+                ? 'bg-purple-600 text-white shadow-md'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Users size={16} />
+            <span>Team Appraisal Reports</span>
+          </button>
+          <button
+            onClick={() => setReportTab('MY_RATINGS')}
+            className={`flex items-center space-x-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              reportTab === 'MY_RATINGS'
+                ? 'bg-purple-600 text-white shadow-md'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <User size={16} />
+            <span>My Personal Ratings & Reports</span>
+          </button>
+        </div>
       </div>
+
+      {reportTab === 'MY_RATINGS' ? (
+        /* MANAGER'S PERSONAL RATINGS & REPORTS VIEW */
+        <div className="space-y-8 animate-fadeIn">
+          {/* Top Personal Ratings Card */}
+          <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200/80 shadow-xs space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+              <div>
+                <span className="text-xs font-bold text-pms-green uppercase tracking-wider block mb-1">
+                  Manager Self & HR Appraisal Record
+                </span>
+                <h2 className="text-xl font-bold text-slate-900">My Performance Score History & Evaluation</h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Inspect your ratings, manager & HR feedback, and per-KPI evaluation score graphs.
+                </p>
+              </div>
+
+              {myCurrentAssignment && (
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => handleDownload(myCurrentAssignment.assignmentId, 'pdf', myCurrentAssignment.employee.name || 'My_Report')}
+                    className="flex items-center space-x-2 px-4 py-2 bg-pms-green hover:bg-pms-darkGreen text-white text-xs font-bold rounded-xl shadow-xs transition-all"
+                  >
+                    <Download size={15} />
+                    <span>Download My PDF Report</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Current Assignment KPI Table & Bar Graphs */}
+            {myCurrentAssignment ? (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between bg-purple-50/70 p-4 rounded-2xl border border-purple-200/80">
+                  <div className="flex items-center space-x-3">
+                    <Award className="text-purple-700" size={24} />
+                    <div>
+                      <h4 className="text-sm font-bold text-purple-950">Active Cycle: {myCurrentAssignment.cycleMonth}</h4>
+                      <p className="text-xs text-purple-700">Status: {myCurrentAssignment.status.replace(/_/g, ' ')}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Final Approved Score</span>
+                    <span className="text-2xl font-black text-purple-900">
+                      {myCurrentAssignment.overallScore !== null ? myCurrentAssignment.overallScore.toFixed(2) : 'Under Review'}
+                      <span className="text-xs font-semibold text-slate-400"> / 5.0</span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Per-KPI Detailed Cards with Graphs */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">KPI Ratings & Score Comparison Graphs</h3>
+                  {myCurrentAssignment.kpis.map((kpi: any, idx: number) => {
+                    const effectiveRating = kpi.hrRating ?? kpi.managerRating ?? kpi.selfRating ?? 0;
+                    return (
+                      <div key={kpi.kpiId} className="bg-slate-50/70 rounded-2xl border border-slate-200/80 p-6 space-y-4">
+                        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                          <div className="flex-1 space-y-1">
+                            <div className="flex items-center space-x-2">
+                              <span className="w-6 h-6 rounded-lg bg-pms-lightGreen text-pms-darkGreen text-xs font-bold flex items-center justify-center">
+                                {idx + 1}
+                              </span>
+                              <h4 className="text-sm font-bold text-slate-900">{kpi.kpiName}</h4>
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700">
+                                Weight: {kpi.weightage}%
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-500 leading-relaxed">{kpi.description}</p>
+                          </div>
+
+                          <div className="shrink-0 text-right bg-white p-3 rounded-xl border border-slate-200 min-w-[120px]">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Manager & HR Rating</span>
+                            <span className="text-lg font-black text-purple-900">{effectiveRating.toFixed(1)} / 5.0</span>
+                          </div>
+                        </div>
+
+                        {/* Per-KPI Score Bar Graph Comparison */}
+                        <div className="bg-white p-4 rounded-xl border border-slate-200/80 space-y-2">
+                          <div className="flex justify-between text-[10px] font-bold text-slate-600">
+                            <span>Score Comparison Graph</span>
+                            <span className="text-purple-700 font-extrabold">Effective: {effectiveRating.toFixed(1)}</span>
+                          </div>
+                          <div className="space-y-1.5">
+                            <div>
+                              <div className="flex justify-between text-[10px] text-slate-500 font-semibold mb-0.5">
+                                <span>Self Rating</span>
+                                <span>{kpi.selfRating !== null ? kpi.selfRating.toFixed(1) : 'N/A'}</span>
+                              </div>
+                              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                                <div className="bg-blue-500 h-full rounded-full" style={{ width: `${((kpi.selfRating || 0) / 5) * 100}%` }}></div>
+                              </div>
+                            </div>
+                            <div>
+                              <div className="flex justify-between text-[10px] text-purple-700 font-semibold mb-0.5">
+                                <span>Manager & HR Rating</span>
+                                <span>{effectiveRating.toFixed(1)}</span>
+                              </div>
+                              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                                <div className="bg-purple-600 h-full rounded-full" style={{ width: `${(effectiveRating / 5) * 100}%` }}></div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {kpi.comments && (
+                          <p className="text-[11px] text-slate-600 bg-white p-3 rounded-xl border border-slate-200/70 italic">
+                            <strong>My Self Comments:</strong> "{kpi.comments}"
+                          </p>
+                        )}
+                        {kpi.managerComments && (
+                          <p className="text-[11px] text-purple-950 bg-purple-100/60 p-3 rounded-xl border border-purple-200 italic">
+                            <strong>Manager & HR Remarks:</strong> "{kpi.managerComments}"
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="p-8 text-center text-slate-400 text-xs font-semibold">
+                No current appraisal record loaded.
+              </div>
+            )}
+          </div>
+
+          {/* Historical Cycles List */}
+          {myHistoryList.length > 0 && (
+            <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
+              <h3 className="text-sm font-bold text-slate-800 flex items-center space-x-2">
+                <Clock size={16} className="text-slate-400" />
+                <span>Previous Months Appraisal Reports</span>
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {myHistoryList.map((h: PmsHistory) => (
+                  <div key={h.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 flex flex-col justify-between space-y-3">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-sm text-slate-900">{h.cycleMonth} Appraisal</h4>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-800">
+                          {h.grade}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1">Finalized on {h.finalizedDate}</p>
+                      <div className="text-xl font-black text-purple-950 mt-2">
+                        {h.finalScore.toFixed(2)} <span className="text-xs text-slate-400 font-normal">/ 5.0</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-200/60 flex items-center justify-end space-x-2">
+                      <button
+                        onClick={() => handleDownload(h.assignmentId || h.id, 'pdf', 'My_Report')}
+                        className="px-3 py-1.5 bg-pms-green text-white text-xs font-bold rounded-lg hover:bg-pms-darkGreen transition-colors flex items-center space-x-1"
+                      >
+                        <Download size={13} />
+                        <span>Download PDF</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* DIRECT REPORTS TEAM APPRAISAL VIEW */
+        <>
 
       {error && (
         <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 flex items-center space-x-3 text-sm font-medium">
@@ -161,8 +380,8 @@ export const ManagerReportsPage: React.FC = () => {
               onChange={(e) => setSelectedEmployeeId(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-pms-green focus:bg-white"
             >
-              <option value="ALL">All Team Members ({reportsData?.assignedEmployees.length})</option>
-              {reportsData?.assignedEmployees.map((e) => (
+              <option value="ALL">All Team Members ({reportsData?.assignedEmployees.length || 0})</option>
+              {reportsData?.assignedEmployees.map((e: ManagerEmployeeItem) => (
                 <option key={e.id} value={e.id.toString()}>{e.name} ({e.employeeCode})</option>
               ))}
             </select>
@@ -177,7 +396,7 @@ export const ManagerReportsPage: React.FC = () => {
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-pms-green focus:bg-white"
             >
               <option value="ALL">All Cycles</option>
-              {uniqueMonths.map((m) => (
+              {uniqueMonths.map((m: string) => (
                 <option key={m} value={m}>{m}</option>
               ))}
             </select>
@@ -238,7 +457,7 @@ export const ManagerReportsPage: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                filteredEmployees.map((emp) => {
+                filteredEmployees.map((emp: ManagerEmployeeItem) => {
                   const isFinalized = emp.status === 'COMPLETED' || emp.status === 'FINAL_RESULT_PUBLISHED';
 
                   return (
@@ -315,6 +534,8 @@ export const ManagerReportsPage: React.FC = () => {
           </table>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 };

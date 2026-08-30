@@ -3,8 +3,12 @@ package com.aseuro.pms.service;
 import com.aseuro.pms.dto.CreateKpiMasterRequest;
 import com.aseuro.pms.dto.KpiMasterDto;
 import com.aseuro.pms.dto.UpdateKpiMasterRequest;
+import com.aseuro.pms.entity.Designation;
 import com.aseuro.pms.exception.ApiException;
+import com.aseuro.pms.model.Employee;
 import com.aseuro.pms.model.KpiMaster;
+import com.aseuro.pms.repository.DesignationRepository;
+import com.aseuro.pms.repository.EmployeeRepository;
 import com.aseuro.pms.repository.KpiMasterRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -20,30 +24,52 @@ import java.util.stream.Collectors;
 public class HrKpiService {
 
     private final KpiMasterRepository kpiMasterRepository;
+    private final DesignationRepository designationRepository;
+    private final EmployeeRepository employeeRepository;
 
-    public HrKpiService(KpiMasterRepository kpiMasterRepository) {
+    public HrKpiService(KpiMasterRepository kpiMasterRepository, DesignationRepository designationRepository, EmployeeRepository employeeRepository) {
         this.kpiMasterRepository = kpiMasterRepository;
+        this.designationRepository = designationRepository;
+        this.employeeRepository = employeeRepository;
     }
 
     @Transactional(readOnly = true)
     public List<String> getAllDesignations() {
-        List<KpiMaster> all = kpiMasterRepository.findAll();
         Set<String> designations = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-        all.forEach(k -> {
+
+        // 1. Standard designations
+        designations.addAll(List.of(
+                "Software Engineer",
+                "Senior Software Engineer",
+                "Tech Lead",
+                "Engineering Manager",
+                "QA Engineer"
+        ));
+
+        // 2. Designations from Designation Entity Table
+        List<Designation> customDesigs = designationRepository.findAll();
+        customDesigs.forEach(d -> {
+            if (d.getName() != null && !d.getName().trim().isEmpty()) {
+                designations.add(d.getName().trim());
+            }
+        });
+
+        // 3. Designations from KpiMaster
+        List<KpiMaster> kpiMasters = kpiMasterRepository.findAll();
+        kpiMasters.forEach(k -> {
             if (k.getDesignation() != null && !k.getDesignation().trim().isEmpty()) {
                 designations.add(k.getDesignation().trim());
             }
         });
-        // Default standard designations if empty
-        if (designations.isEmpty()) {
-            designations.addAll(List.of(
-                    "Software Engineer",
-                    "Senior Software Engineer",
-                    "Tech Lead",
-                    "Engineering Manager",
-                    "QA Engineer"
-            ));
-        }
+
+        // 4. Designations from Employees
+        List<Employee> employees = employeeRepository.findAll();
+        employees.forEach(e -> {
+            if (e.getDesignation() != null && !e.getDesignation().trim().isEmpty()) {
+                designations.add(e.getDesignation().trim());
+            }
+        });
+
         return new ArrayList<>(designations);
     }
 
@@ -73,6 +99,8 @@ public class HrKpiService {
                 .kpiName(request.getKpiName().trim())
                 .description(request.getDescription() != null ? request.getDescription().trim() : "")
                 .weightage(request.getWeightage())
+                .selfRatingScale(request.getSelfRatingScale() != null && !request.getSelfRatingScale().trim().isEmpty() ? request.getSelfRatingScale().trim() : "1.0 - 5.0 Rating Scale")
+                .managerRatingScale(request.getManagerRatingScale() != null && !request.getManagerRatingScale().trim().isEmpty() ? request.getManagerRatingScale().trim() : "1.0 - 5.0 Rating Scale")
                 .status("ACTIVE")
                 .build();
 
@@ -100,6 +128,12 @@ public class HrKpiService {
             kpi.setDescription(request.getDescription().trim());
         }
         kpi.setWeightage(request.getWeightage());
+        if (request.getSelfRatingScale() != null) {
+            kpi.setSelfRatingScale(request.getSelfRatingScale().trim());
+        }
+        if (request.getManagerRatingScale() != null) {
+            kpi.setManagerRatingScale(request.getManagerRatingScale().trim());
+        }
         if (request.getStatus() != null) {
             kpi.setStatus(request.getStatus().trim());
         }
@@ -122,6 +156,8 @@ public class HrKpiService {
                 .kpiName(k.getKpiName())
                 .description(k.getDescription())
                 .weightage(k.getWeightage())
+                .selfRatingScale(k.getSelfRatingScale() != null ? k.getSelfRatingScale() : "1.0 - 5.0 Rating Scale")
+                .managerRatingScale(k.getManagerRatingScale() != null ? k.getManagerRatingScale() : "1.0 - 5.0 Rating Scale")
                 .status(k.getStatus())
                 .build();
     }

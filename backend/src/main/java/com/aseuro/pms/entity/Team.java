@@ -42,8 +42,7 @@ public class Team {
     private String description;
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(nullable = false, columnDefinition = "record_status")
+    @Column(nullable = false)
     private RecordStatus status = RecordStatus.ACTIVE;
 
     @CreationTimestamp

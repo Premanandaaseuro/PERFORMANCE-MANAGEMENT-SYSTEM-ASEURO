@@ -95,7 +95,7 @@ public class ReportService {
                 contentStream.beginText();
                 contentStream.setFont(fontBold, 14);
                 contentStream.newLineAtOffset(50, 530);
-                contentStream.showText("KPI Performance Breakdown:");
+                contentStream.showText("KPI Combined Performance Breakdown:");
                 contentStream.endText();
 
                 int yPosition = 500;
@@ -104,43 +104,62 @@ public class ReportService {
                             .filter(r -> r.getKpi().getId().equals(kpi.getId()))
                             .findFirst().orElse(null);
 
-                    Double hrRatingVal = rating != null ? rating.getHrRating() : null;
-                    if (hrRatingVal == null) {
-                        if (rating != null && rating.getManagerRating() != null) hrRatingVal = rating.getManagerRating();
-                        else if (rating != null && rating.getSelfRating() != null) hrRatingVal = rating.getSelfRating();
-                        else if (assignment.getOverallScore() != null) hrRatingVal = assignment.getOverallScore();
-                        else hrRatingVal = 5.0;
+                    Double effRating = null;
+                    if (rating != null) {
+                        if (rating.getHrRating() != null) effRating = rating.getHrRating();
+                        else if (rating.getManagerRating() != null) effRating = rating.getManagerRating();
+                        else if (rating.getSelfRating() != null) effRating = rating.getSelfRating();
                     }
+                    if (effRating == null && assignment.getOverallScore() != null) {
+                        effRating = assignment.getOverallScore();
+                    }
+                    if (effRating == null) effRating = 5.0;
 
                     String selfStr = (rating != null && rating.getSelfRating() != null) ? String.format("%.1f", rating.getSelfRating()) : "N/A";
                     String mgrStr = (rating != null && rating.getManagerRating() != null) ? String.format("%.1f", rating.getManagerRating()) : "N/A";
-                    String hrStr = String.format("%.1f", hrRatingVal);
+                    String hrStr = (rating != null && rating.getHrRating() != null) ? String.format("%.1f", rating.getHrRating()) : "N/A";
+                    String combStr = String.format("%.1f", effRating);
 
                     contentStream.beginText();
                     contentStream.setFont(fontBold, 11);
                     contentStream.newLineAtOffset(50, yPosition);
                     contentStream.showText("• " + kpi.getKpiName() + " (Weightage: " + kpi.getWeightage() + "%)");
-                    contentStream.setFont(fontRegular, 10);
-                    contentStream.newLineAtOffset(0, -15);
-                    contentStream.showText("  Self Rating: " + selfStr + " | Manager Rating: " + mgrStr + " | HR Rating: " + hrStr);
+                    contentStream.setFont(fontRegular, 9);
+                    contentStream.newLineAtOffset(0, -14);
+                    contentStream.showText("  Self Rating: " + selfStr + " | Manager Rating: " + mgrStr + " | HR Rating: " + hrStr + " | Combined: " + combStr);
+
+                    if (rating != null && rating.getComments() != null && !rating.getComments().trim().isEmpty()) {
+                        contentStream.newLineAtOffset(0, -12);
+                        String empNote = rating.getComments().length() > 70 ? rating.getComments().substring(0, 67) + "..." : rating.getComments();
+                        contentStream.showText("  Employee Note: \"" + empNote + "\"");
+                    }
+
+                    if (rating != null && rating.getManagerComments() != null && !rating.getManagerComments().trim().isEmpty()) {
+                        contentStream.newLineAtOffset(0, -12);
+                        String mgrNote = rating.getManagerComments().length() > 70 ? rating.getManagerComments().substring(0, 67) + "..." : rating.getManagerComments();
+                        contentStream.showText("  Manager Feedback: \"" + mgrNote + "\"");
+                    }
+
                     contentStream.endText();
 
-                    yPosition -= 35;
+                    yPosition -= 45;
                     if (yPosition < 100) {
-                        break; // Stop to prevent drawing off-page in simple PDF generation
+                        break; // Prevent drawing off-page
                     }
                 }
 
-                // Overall Review
+                // Overall Review & Manager Feedback Summary
                 if (yPosition > 120 && !reviews.isEmpty()) {
                     contentStream.beginText();
                     contentStream.setFont(fontBold, 12);
                     contentStream.newLineAtOffset(50, yPosition - 10);
-                    contentStream.showText("Reviews & Remarks:");
+                    contentStream.showText("Official Manager & HR Remarks:");
                     contentStream.setFont(fontRegular, 10);
                     for (EmployeeReview rev : reviews) {
-                        contentStream.newLineAtOffset(0, -20);
-                        contentStream.showText(rev.getReviewer().getRole().name().replace("ROLE_", "") + ": " + rev.getComments());
+                        contentStream.newLineAtOffset(0, -18);
+                        String revText = rev.getReviewer().getRole().name().replace("ROLE_", "") + " (" + rev.getReviewer().getName() + "): " + rev.getComments();
+                        if (revText.length() > 85) revText = revText.substring(0, 82) + "...";
+                        contentStream.showText(revText);
                     }
                     contentStream.endText();
                 }
@@ -168,17 +187,17 @@ public class ReportService {
         List<EmployeeKpiRating> ratings = employeeKpiRatingRepository.findByAssignment(assignment);
 
         try (Workbook workbook = new XSSFWorkbook()) {
-            Sheet sheet = workbook.createSheet("PMS Report");
+            Sheet sheet = workbook.createSheet("PMS Final Combined Report");
 
             // Header Font & Style
             Font headerFont = workbook.createFont();
             headerFont.setBold(true);
-            headerFont.setFontHeightInPoints((short) 12);
+            headerFont.setFontHeightInPoints((short) 11);
             headerFont.setColor(IndexedColors.WHITE.getIndex());
 
             CellStyle headerCellStyle = workbook.createCellStyle();
             headerCellStyle.setFont(headerFont);
-            headerCellStyle.setFillForegroundColor(IndexedColors.GREY_80_PERCENT.getIndex());
+            headerCellStyle.setFillForegroundColor(IndexedColors.DARK_TEAL.getIndex());
             headerCellStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
 
             // Employee details
@@ -196,7 +215,7 @@ public class ReportService {
             rInfo3.createCell(1).setCellValue(assignment.getCycleMonth());
 
             Row rInfo4 = sheet.createRow(rowNum++);
-            rInfo4.createCell(0).setCellValue("Overall Score:");
+            rInfo4.createCell(0).setCellValue("Combined Final Score:");
             rInfo4.createCell(1).setCellValue(assignment.getOverallScore() != null ? assignment.getOverallScore() : 0.0);
 
             Row rInfo5 = sheet.createRow(rowNum++);
@@ -207,7 +226,7 @@ public class ReportService {
 
             // KPI Header row
             Row headerRow = sheet.createRow(rowNum++);
-            String[] columns = {"KPI Name", "Measurement Criteria", "Weightage", "Self Rating", "Manager Rating", "HR Rating", "Comments"};
+            String[] columns = {"KPI Name", "Measurement Description", "Weightage", "Self Rating", "Manager Rating", "HR Rating", "Combined Effective Rating", "Employee Comments", "Manager Feedback"};
             for (int i = 0; i < columns.length; i++) {
                 Cell cell = headerRow.createCell(i);
                 cell.setCellValue(columns[i]);
@@ -220,13 +239,16 @@ public class ReportService {
                         .filter(r -> r.getKpi().getId().equals(kpi.getId()))
                         .findFirst().orElse(null);
 
-                Double hrRatingVal = rating != null ? rating.getHrRating() : null;
-                if (hrRatingVal == null) {
-                    if (rating != null && rating.getManagerRating() != null) hrRatingVal = rating.getManagerRating();
-                    else if (rating != null && rating.getSelfRating() != null) hrRatingVal = rating.getSelfRating();
-                    else if (assignment.getOverallScore() != null) hrRatingVal = assignment.getOverallScore();
-                    else hrRatingVal = 5.0;
+                Double effRating = null;
+                if (rating != null) {
+                    if (rating.getHrRating() != null) effRating = rating.getHrRating();
+                    else if (rating.getManagerRating() != null) effRating = rating.getManagerRating();
+                    else if (rating.getSelfRating() != null) effRating = rating.getSelfRating();
                 }
+                if (effRating == null && assignment.getOverallScore() != null) {
+                    effRating = assignment.getOverallScore();
+                }
+                if (effRating == null) effRating = 0.0;
 
                 Row row = sheet.createRow(rowNum++);
                 row.createCell(0).setCellValue(kpi.getKpiName());
@@ -234,8 +256,10 @@ public class ReportService {
                 row.createCell(2).setCellValue(kpi.getWeightage() + "%");
                 row.createCell(3).setCellValue(rating != null && rating.getSelfRating() != null ? rating.getSelfRating() : 0.0);
                 row.createCell(4).setCellValue(rating != null && rating.getManagerRating() != null ? rating.getManagerRating() : 0.0);
-                row.createCell(5).setCellValue(hrRatingVal);
-                row.createCell(6).setCellValue(rating != null && rating.getComments() != null ? rating.getComments() : "");
+                row.createCell(5).setCellValue(rating != null && rating.getHrRating() != null ? rating.getHrRating() : 0.0);
+                row.createCell(6).setCellValue(effRating);
+                row.createCell(7).setCellValue(rating != null && rating.getComments() != null ? rating.getComments() : "");
+                row.createCell(8).setCellValue(rating != null && rating.getManagerComments() != null ? rating.getManagerComments() : "");
             }
 
             // Auto-size columns

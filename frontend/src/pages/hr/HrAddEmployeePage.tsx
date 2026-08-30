@@ -15,7 +15,10 @@ import {
   Mail,
   User,
   Hash,
-  Users
+  Users,
+  Plus,
+  X,
+  Briefcase
 } from 'lucide-react';
 
 export const HrAddEmployeePage: React.FC = () => {
@@ -24,6 +27,13 @@ export const HrAddEmployeePage: React.FC = () => {
   const [managers, setManagers] = useState<ManagerOption[]>([]);
   const [mappedKpis, setMappedKpis] = useState<KpiMasterItem[]>([]);
   const [kpisLoading, setKpisLoading] = useState(false);
+
+  // Add New Role Modal State
+  const [addRoleModalOpen, setAddRoleModalOpen] = useState(false);
+  const [newRoleName, setNewRoleName] = useState('');
+  const [newRoleDescription, setNewRoleDescription] = useState('');
+  const [addRoleLoading, setAddRoleLoading] = useState(false);
+  const [addRoleError, setAddRoleError] = useState<string | null>(null);
 
   // Form fields
   const [name, setName] = useState('');
@@ -77,6 +87,32 @@ export const HrAddEmployeePage: React.FC = () => {
   const handleDesignationChange = (newDesig: string) => {
     setDesignation(newDesig);
     fetchKpisForDesignation(newDesig);
+  };
+
+  const handleCreateRoleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newRoleName.trim()) {
+      setAddRoleError('Role name is required.');
+      return;
+    }
+    setAddRoleLoading(true);
+    setAddRoleError(null);
+    try {
+      const created = await hrApi.createDesignation(newRoleName.trim(), newRoleDescription.trim());
+      const updatedDesigs = await hrApi.getDesignations();
+      setDesignations(updatedDesigs);
+      setDesignation(created.name);
+      fetchKpisForDesignation(created.name);
+      setNewRoleName('');
+      setNewRoleDescription('');
+      setAddRoleModalOpen(false);
+      setSuccess(`New role "${created.name}" created and automatically selected.`);
+    } catch (err: any) {
+      console.error(err);
+      setAddRoleError(err.response?.data?.message || err.message || 'Failed to create role.');
+    } finally {
+      setAddRoleLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -264,9 +300,24 @@ export const HrAddEmployeePage: React.FC = () => {
 
             {/* Designation Dropdown (DB Driven) */}
             <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">
-                Designation / Role *
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider">
+                  Designation / Role *
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewRoleName('');
+                    setNewRoleDescription('');
+                    setAddRoleError(null);
+                    setAddRoleModalOpen(true);
+                  }}
+                  className="text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline flex items-center space-x-1"
+                >
+                  <Plus size={14} />
+                  <span>+ Add New Role</span>
+                </button>
+              </div>
               <select
                 value={designation}
                 onChange={(e) => handleDesignationChange(e.target.value)}
@@ -398,6 +449,84 @@ export const HrAddEmployeePage: React.FC = () => {
           </div>
         </form>
       </div>
+
+      {/* Add New Role / Designation Modal */}
+      {addRoleModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 relative animate-scaleUp">
+            <button
+              onClick={() => setAddRoleModalOpen(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 bg-slate-100 p-1.5 rounded-full transition-all"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
+                <Briefcase size={22} />
+              </div>
+              <div>
+                <h3 className="text-lg font-extrabold text-slate-900">Add New Role / Designation</h3>
+                <p className="text-xs text-slate-500 font-medium">Create a custom role for KPI mapping and employee assignment</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleCreateRoleSubmit} className="space-y-4">
+              {addRoleError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-800 flex items-center space-x-2">
+                  <AlertCircle size={16} className="text-rose-600 shrink-0" />
+                  <span>{addRoleError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Role / Designation Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newRoleName}
+                  onChange={(e) => setNewRoleName(e.target.value)}
+                  placeholder="e.g. DevOps Specialist, AI Engineer"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Role Description (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={newRoleDescription}
+                  onChange={(e) => setNewRoleDescription(e.target.value)}
+                  placeholder="Responsibilities & profile summary for this role..."
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
+                />
+              </div>
+
+              <div className="flex items-center space-x-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setAddRoleModalOpen(false)}
+                  className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={addRoleLoading}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all disabled:opacity-50 flex items-center justify-center space-x-1.5"
+                >
+                  <Plus size={16} />
+                  <span>{addRoleLoading ? 'Saving Role...' : 'Save & Select Role'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

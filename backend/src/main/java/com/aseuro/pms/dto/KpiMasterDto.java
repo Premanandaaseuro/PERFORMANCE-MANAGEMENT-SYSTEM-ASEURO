@@ -15,5 +15,7 @@ public class KpiMasterDto {
     private String kpiName;
     private String description;
     private Double weightage;
+    private String selfRatingScale;
+    private String managerRatingScale;
     private String status;
 }

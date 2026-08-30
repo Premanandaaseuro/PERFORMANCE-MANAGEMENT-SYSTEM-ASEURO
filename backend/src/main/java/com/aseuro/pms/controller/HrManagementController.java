@@ -35,6 +35,7 @@ public class HrManagementController {
     private final PmsAssignmentRepository pmsAssignmentRepository;
     private final PmsKpiRepository pmsKpiRepository;
     private final KpiMasterRepository kpiMasterRepository;
+    private final DesignationRepository designationRepository;
     private final PasswordEncoder passwordEncoder;
     private final HrKpiService hrKpiService;
     private final HrLifecycleService hrLifecycleService;
@@ -77,6 +78,34 @@ public class HrManagementController {
             result.add(Map.of("id", id++, "name", d, "description", d + " Role Profile"));
         }
         return ResponseEntity.ok(result);
+    }
+
+    // Create New Role / Designation
+    @PostMapping("/designations")
+    @Transactional
+    public ResponseEntity<Map<String, Object>> createDesignation(@RequestBody Map<String, String> request) {
+        String name = request.get("name");
+        if (name == null || name.trim().isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Role / Designation name is required.");
+        }
+        String desigName = name.trim();
+        String description = request.get("description") != null ? request.get("description").trim() : desigName + " Role Profile";
+
+        Optional<com.aseuro.pms.entity.Designation> existingOpt = designationRepository.findByNameIgnoreCase(desigName);
+        com.aseuro.pms.entity.Designation designation;
+        if (existingOpt.isPresent()) {
+            designation = existingOpt.get();
+        } else {
+            designation = new com.aseuro.pms.entity.Designation(desigName, description);
+            designation = designationRepository.save(designation);
+        }
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                "id", designation.getId(),
+                "name", designation.getName(),
+                "description", designation.getDescription() != null ? designation.getDescription() : "",
+                "message", "Role / Designation created successfully."
+        ));
     }
 
     // 3. Manager Options for Dropdown & List
@@ -340,6 +369,15 @@ public class HrManagementController {
     public ResponseEntity<Map<String, Object>> getLifecycleDetail(@PathVariable Long employeeId) {
         Map<String, Object> data = hrLifecycleService.getEmployeeLifecycle(employeeId);
         return ResponseEntity.ok(data);
+    }
+
+    // HR Edit KPI Ratings and Comments
+    @PutMapping("/lifecycle/{assignmentId}/ratings")
+    public ResponseEntity<Map<String, Object>> updateKpiRatings(
+            @PathVariable Long assignmentId,
+            @RequestBody HrUpdateKpiRatingsRequest request) {
+        Map<String, Object> result = hrLifecycleService.updateKpiRatingsAndComments(assignmentId, request);
+        return ResponseEntity.ok(result);
     }
 
     // 9. HR Finalise and Submit

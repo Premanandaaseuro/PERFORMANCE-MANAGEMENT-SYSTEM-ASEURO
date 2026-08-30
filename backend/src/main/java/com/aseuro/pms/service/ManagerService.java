@@ -257,7 +257,7 @@ public class ManagerService {
             item.put("selfRating", r != null ? r.getSelfRating() : null);
             item.put("employeeComments", r != null ? r.getComments() : null);
             item.put("managerRating", r != null ? r.getManagerRating() : null);
-            item.put("managerComments", r != null && r.getComments() != null ? r.getComments() : null);
+            item.put("managerComments", r != null ? r.getManagerComments() : null);
 
             if (r != null && r.getSelfRating() != null) {
                 selfWeightedSum += r.getSelfRating() * (kpi.getWeightage() / 100.0);
@@ -350,6 +350,9 @@ public class ManagerService {
                             .build());
 
             rating.setManagerRating(entry.getManagerRating());
+            if (entry.getManagerComments() != null) {
+                rating.setManagerComments(entry.getManagerComments());
+            }
             rating.setStatus("MANAGER_REVIEWED");
             employeeKpiRatingRepository.save(rating);
         }

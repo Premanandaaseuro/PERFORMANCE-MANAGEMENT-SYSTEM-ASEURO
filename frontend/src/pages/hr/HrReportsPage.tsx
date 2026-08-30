@@ -476,9 +476,15 @@ export const HrReportsPage: React.FC = () => {
                               <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{kpi.description}</p>
                             )}
                             {kpi.comments && (
-                              <div className="mt-1 text-[11px] text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-100 flex items-start space-x-1.5">
+                              <div className="mt-1 text-[11px] text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-150 flex items-start space-x-1.5">
                                 <MessageSquare size={12} className="text-slate-400 shrink-0 mt-0.5" />
-                                <span><strong>Feedback:</strong> {kpi.comments}</span>
+                                <span><strong>Employee Note:</strong> {kpi.comments}</span>
+                              </div>
+                            )}
+                            {kpi.managerComments && (
+                              <div className="mt-1 text-[11px] text-purple-900 bg-purple-50/70 p-2 rounded-lg border border-purple-200/60 flex items-start space-x-1.5">
+                                <MessageSquare size={12} className="text-purple-500 shrink-0 mt-0.5" />
+                                <span><strong>Manager Feedback:</strong> {kpi.managerComments}</span>
                               </div>
                             )}
                           </td>

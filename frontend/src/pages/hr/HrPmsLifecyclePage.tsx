@@ -7,6 +7,7 @@ import {
   Search,
   ArrowLeft,
   User,
+  Users,
   CheckCircle2,
   Clock,
   AlertCircle,
@@ -16,8 +17,11 @@ import {
   FileCheck,
   ShieldCheck,
   ChevronRight,
-  Download
+  Download,
+  Save
 } from 'lucide-react';
+
+import { RatingScaleLegend } from '../../components/RatingScaleLegend';
 
 export const HrPmsLifecyclePage: React.FC = () => {
   const navigate = useNavigate();
@@ -36,9 +40,25 @@ export const HrPmsLifecyclePage: React.FC = () => {
   const [hrComments, setHrComments] = useState('Reviewed and approved by HR Administration.');
   const [finalizing, setFinalizing] = useState(false);
 
-  // Individual HR & Manager KPI Ratings State (Editable by HR)
+  // Individual HR, Manager & Self Ratings & Comments State (Editable by HR)
   const [hrRatings, setHrRatings] = useState<Record<number, number>>({});
   const [managerRatings, setManagerRatings] = useState<Record<number, number>>({});
+  const [selfRatings, setSelfRatings] = useState<Record<number, number>>({});
+  const [employeeCommentsMap, setEmployeeCommentsMap] = useState<Record<number, string>>({});
+  const [managerCommentsMap, setManagerCommentsMap] = useState<Record<number, string>>({});
+  const [savingRatings, setSavingRatings] = useState<boolean>(false);
+
+  const isHrStandardKpiName = (name: string): boolean => {
+    if (!name) return false;
+    const n = name.trim().toLowerCase();
+    return (
+      n.includes('leave pattern') ||
+      n.includes('team collaboration') ||
+      n.includes('punctuality') ||
+      n.includes('new initiatives') ||
+      n.includes('rewards')
+    );
+  };
 
   useEffect(() => {
     // Initial load: search all employees
@@ -87,12 +107,24 @@ export const HrPmsLifecyclePage: React.FC = () => {
         setLifecycleData(data);
         const initialHrRatings: Record<number, number> = {};
         const initialMgrRatings: Record<number, number> = {};
+        const initialSelfRatings: Record<number, number> = {};
+        const initialEmpComments: Record<number, string> = {};
+        const initialMgrComments: Record<number, string> = {};
+
         data.kpis.forEach((kpi) => {
           initialHrRatings[kpi.kpiId] = kpi.hrRating ?? kpi.managerRating ?? kpi.selfRating ?? 5.0;
           initialMgrRatings[kpi.kpiId] = kpi.managerRating ?? kpi.selfRating ?? 5.0;
+          initialSelfRatings[kpi.kpiId] = kpi.selfRating ?? 5.0;
+          initialEmpComments[kpi.kpiId] = kpi.employeeComments || kpi.comments || '';
+          initialMgrComments[kpi.kpiId] = kpi.managerComments || '';
         });
+
         setHrRatings(initialHrRatings);
         setManagerRatings(initialMgrRatings);
+        setSelfRatings(initialSelfRatings);
+        setEmployeeCommentsMap(initialEmpComments);
+        setManagerCommentsMap(initialMgrComments);
+
         recalculateHrScore(data.kpis, initialHrRatings);
         setLoading(false);
       })
@@ -101,6 +133,35 @@ export const HrPmsLifecyclePage: React.FC = () => {
         setError('Failed to load employee PMS lifecycle.');
         setLoading(false);
       });
+  };
+
+  const handleSaveRatingsAndComments = async () => {
+    if (!lifecycleData?.assignmentId) return;
+    try {
+      setSavingRatings(true);
+      setError(null);
+      const payload = {
+        kpiRatings: lifecycleData.kpis.map((kpi) => ({
+          kpiId: kpi.kpiId,
+          selfRating: selfRatings[kpi.kpiId] !== undefined ? selfRatings[kpi.kpiId] : kpi.selfRating,
+          employeeComments: employeeCommentsMap[kpi.kpiId] !== undefined ? employeeCommentsMap[kpi.kpiId] : (kpi.employeeComments || kpi.comments || ''),
+          managerRating: managerRatings[kpi.kpiId] !== undefined ? managerRatings[kpi.kpiId] : kpi.managerRating,
+          managerComments: managerCommentsMap[kpi.kpiId] !== undefined ? managerCommentsMap[kpi.kpiId] : (kpi.managerComments || ''),
+          hrRating: hrRatings[kpi.kpiId] !== undefined ? hrRatings[kpi.kpiId] : kpi.hrRating
+        }))
+      };
+      await hrApi.updateLifecycleRatings(lifecycleData.assignmentId, payload);
+      setSuccess('KPI Ratings & Comments updated successfully! Changes are immediately reflected in Employee and Manager modules.');
+      setTimeout(() => setSuccess(null), 5000);
+      if (selectedEmployeeId) {
+        fetchLifecycle(selectedEmployeeId);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.response?.data?.message || 'Failed to save KPI ratings and comments.');
+    } finally {
+      setSavingRatings(false);
+    }
   };
 
   const deriveGrade = (score: number) => {
@@ -166,6 +227,48 @@ export const HrPmsLifecyclePage: React.FC = () => {
     }
   };
 
+  // Filter state for PMS status
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING_SELF' | 'PENDING_MANAGER' | 'COMPLETED'>('ALL');
+
+  // Helper status matchers
+  const isPendingSelf = (st?: string) => {
+    if (!st) return true;
+    return st.includes('SELF') || st.includes('DRAFT') || st === 'PENDING';
+  };
+
+  const isPendingManager = (st?: string) => {
+    if (!st) return false;
+    return st.includes('SUBMITTED') || st.includes('MANAGER');
+  };
+
+  const isCompletedState = (st?: string) => {
+    if (!st) return false;
+    return st.includes('COMPLETED') || st.includes('FINAL') || st.includes('PUBLISHED');
+  };
+
+  const safeResults = Array.isArray(employeeResults) ? employeeResults : [];
+  const pendingSelfCount = safeResults.filter(e => e && isPendingSelf(e.status)).length;
+  const pendingManagerCount = safeResults.filter(e => e && isPendingManager(e.status)).length;
+  const completedCount = safeResults.filter(e => e && isCompletedState(e.status)).length;
+
+  const filteredEmployees = safeResults.filter(emp => {
+    if (!emp) return false;
+    if (statusFilter === 'PENDING_SELF') return isPendingSelf(emp.status);
+    if (statusFilter === 'PENDING_MANAGER') return isPendingManager(emp.status);
+    if (statusFilter === 'COMPLETED') return isCompletedState(emp.status);
+    return true;
+  });
+
+  const renderPmsStatusBadge = (status?: string) => {
+    if (isCompletedState(status)) {
+      return <span className="px-2 py-0.5 rounded-md text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">Completed</span>;
+    }
+    if (isPendingManager(status)) {
+      return <span className="px-2 py-0.5 rounded-md text-[9px] font-extrabold bg-blue-100 text-blue-800 border border-blue-200">Pending Manager</span>;
+    }
+    return <span className="px-2 py-0.5 rounded-md text-[9px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200">Pending Self</span>;
+  };
+
   const isCompleted = lifecycleData?.status === 'COMPLETED' || lifecycleData?.status === 'FINAL_RESULT_PUBLISHED';
 
   return (
@@ -182,7 +285,7 @@ export const HrPmsLifecyclePage: React.FC = () => {
           </button>
           <h2 className="text-2xl font-bold text-pms-gray">Employee PMS Lifecycle Tracking</h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Monitor real-time appraisal milestones and perform final HR score approvals.
+            Monitor real-time appraisal milestones, edit ratings/comments, and perform final HR score approvals.
           </p>
         </div>
 
@@ -195,6 +298,57 @@ export const HrPmsLifecyclePage: React.FC = () => {
             <span>{isCompleted ? 'Update & Re-Publish Appraisal' : 'Finalise and Submit'}</span>
           </button>
         )}
+      </div>
+
+      {/* Top Summary Stat Cards for PMS Lifecycle Stages */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div 
+          onClick={() => setStatusFilter('ALL')}
+          className={`p-4 rounded-2xl border transition-all cursor-pointer ${statusFilter === 'ALL' ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider opacity-80">Total Registered</span>
+            <Users size={16} />
+          </div>
+          <div className="text-2xl font-extrabold mt-1">{employeeResults.length}</div>
+          <span className="text-[10px] opacity-75 font-medium block mt-0.5">All employees in cycle</span>
+        </div>
+
+        <div 
+          onClick={() => setStatusFilter('PENDING_SELF')}
+          className={`p-4 rounded-2xl border transition-all cursor-pointer ${statusFilter === 'PENDING_SELF' ? 'bg-amber-600 text-white border-amber-600 shadow-md' : 'bg-amber-50/70 border-amber-200 text-amber-900 hover:bg-amber-100/60'}`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider opacity-90">Pending Self Rating</span>
+            <Clock size={16} />
+          </div>
+          <div className="text-2xl font-extrabold mt-1">{pendingSelfCount}</div>
+          <span className="text-[10px] opacity-80 font-medium block mt-0.5">Awaiting self assessment</span>
+        </div>
+
+        <div 
+          onClick={() => setStatusFilter('PENDING_MANAGER')}
+          className={`p-4 rounded-2xl border transition-all cursor-pointer ${statusFilter === 'PENDING_MANAGER' ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-blue-50/70 border-blue-200 text-blue-900 hover:bg-blue-100/60'}`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider opacity-90">Pending Manager Rating</span>
+            <AlertCircle size={16} />
+          </div>
+          <div className="text-2xl font-extrabold mt-1">{pendingManagerCount}</div>
+          <span className="text-[10px] opacity-80 font-medium block mt-0.5">Awaiting manager review</span>
+        </div>
+
+        <div 
+          onClick={() => setStatusFilter('COMPLETED')}
+          className={`p-4 rounded-2xl border transition-all cursor-pointer ${statusFilter === 'COMPLETED' ? 'bg-emerald-700 text-white border-emerald-700 shadow-md' : 'bg-emerald-50/70 border-emerald-200 text-emerald-900 hover:bg-emerald-100/60'}`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider opacity-90">Completed / Finalized</span>
+            <CheckCircle2 size={16} />
+          </div>
+          <div className="text-2xl font-extrabold mt-1">{completedCount}</div>
+          <span className="text-[10px] opacity-80 font-medium block mt-0.5">HR published score</span>
+        </div>
       </div>
 
       {success && (
@@ -217,9 +371,15 @@ export const HrPmsLifecyclePage: React.FC = () => {
         {/* Left Column: Employee Selector */}
         <div className="lg:col-span-4 space-y-4">
           <div className="bg-white p-4 rounded-2xl border border-slate-200/70 shadow-sm space-y-3">
-            <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider">
-              Search Employee:
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider">
+                Select Employee ({filteredEmployees.length})
+              </label>
+              <span className="text-[10px] font-bold text-slate-400">
+                Filter: {statusFilter.replace('_', ' ')}
+              </span>
+            </div>
+
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                 <Search size={15} />
@@ -233,34 +393,73 @@ export const HrPmsLifecyclePage: React.FC = () => {
               />
             </div>
 
+            {/* Lifecycle Stage Filter Tabs */}
+            <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl overflow-x-auto">
+              <button
+                onClick={() => setStatusFilter('ALL')}
+                className={`flex-1 py-1 px-2 text-[10px] font-bold rounded-lg transition-all ${statusFilter === 'ALL' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+              >
+                All ({employeeResults.length})
+              </button>
+              <button
+                onClick={() => setStatusFilter('PENDING_SELF')}
+                className={`flex-1 py-1 px-2 text-[10px] font-bold rounded-lg transition-all ${statusFilter === 'PENDING_SELF' ? 'bg-amber-500 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+              >
+                Self ({pendingSelfCount})
+              </button>
+              <button
+                onClick={() => setStatusFilter('PENDING_MANAGER')}
+                className={`flex-1 py-1 px-2 text-[10px] font-bold rounded-lg transition-all ${statusFilter === 'PENDING_MANAGER' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+              >
+                Mgr ({pendingManagerCount})
+              </button>
+              <button
+                onClick={() => setStatusFilter('COMPLETED')}
+                className={`flex-1 py-1 px-2 text-[10px] font-bold rounded-lg transition-all ${statusFilter === 'COMPLETED' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+              >
+                Done ({completedCount})
+              </button>
+            </div>
+
             {/* List of employees */}
-            <div className="max-h-[500px] overflow-y-auto space-y-1.5 pt-2">
-              {employeeResults.map((emp) => (
-                <button
-                  key={emp.id}
-                  onClick={() => fetchLifecycle(emp.id)}
-                  className={`w-full text-left p-3 rounded-xl transition-all flex items-center justify-between ${
-                    selectedEmployeeId === emp.id
-                      ? 'bg-pms-lightGreen border border-pms-green/30 text-pms-darkGreen font-bold shadow-xs'
-                      : 'hover:bg-slate-50 text-slate-600 border border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center space-x-2.5 min-w-0">
-                    {emp.profilePhoto ? (
-                      <img src={emp.profilePhoto} alt={emp.name} className="w-8 h-8 rounded-full object-cover shrink-0 border border-slate-200" />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center shrink-0">
-                        {emp.name.charAt(0)}
+            <div className="max-h-[480px] overflow-y-auto space-y-1.5 pt-1">
+              {filteredEmployees.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-400">
+                  No employees found matching filter.
+                </div>
+              ) : (
+                filteredEmployees.map((emp) => (
+                  <button
+                    key={emp.id}
+                    onClick={() => fetchLifecycle(emp.id)}
+                    className={`w-full text-left p-3 rounded-xl transition-all flex items-center justify-between ${
+                      selectedEmployeeId === emp.id
+                        ? 'bg-pms-lightGreen border border-pms-green/30 text-pms-darkGreen font-bold shadow-xs'
+                        : 'hover:bg-slate-50 text-slate-600 border border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2.5 min-w-0">
+                      {emp.profilePhoto ? (
+                        <img src={emp.profilePhoto} alt={emp.name} className="w-8 h-8 rounded-full object-cover shrink-0 border border-slate-200" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center shrink-0">
+                          {emp.name.charAt(0)}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <div className="flex items-center space-x-1.5">
+                          <p className="text-xs font-bold truncate">{emp.name}</p>
+                        </div>
+                        <div className="flex items-center space-x-1 mt-0.5">
+                          {renderPmsStatusBadge(emp.status)}
+                          <span className="text-[10px] text-slate-400 truncate">• {emp.designation}</span>
+                        </div>
                       </div>
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold truncate">{emp.name}</p>
-                      <p className="text-[10px] text-slate-400 truncate">{emp.designation}</p>
                     </div>
-                  </div>
-                  <ChevronRight size={14} className="text-slate-400 shrink-0" />
-                </button>
-              ))}
+                    <ChevronRight size={14} className="text-slate-400 shrink-0" />
+                  </button>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -277,28 +476,31 @@ export const HrPmsLifecyclePage: React.FC = () => {
             </div>
           ) : (
             <>
+              {/* Performance Rating Scale Reference */}
+              <RatingScaleLegend defaultExpanded={false} />
+
               {/* Employee Summary Card */}
               <div className="bg-white rounded-2xl border border-slate-200/70 p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="flex items-center space-x-4">
-                  {lifecycleData.employee.profilePhoto ? (
-                    <img src={lifecycleData.employee.profilePhoto} alt={lifecycleData.employee.name} className="w-14 h-14 rounded-2xl object-cover border border-slate-200 shadow-md shrink-0" />
+                  {lifecycleData?.employee?.profilePhoto ? (
+                    <img src={lifecycleData.employee.profilePhoto} alt={lifecycleData.employee.name || 'Employee'} className="w-14 h-14 rounded-2xl object-cover border border-slate-200 shadow-md shrink-0" />
                   ) : (
                     <div className="w-14 h-14 rounded-2xl bg-pms-green text-white font-extrabold text-xl flex items-center justify-center shadow-md shrink-0">
-                      {lifecycleData.employee.name.charAt(0)}
+                      {lifecycleData?.employee?.name ? lifecycleData.employee.name.charAt(0) : 'E'}
                     </div>
                   )}
                   <div>
                     <div className="flex items-center space-x-2">
-                      <h3 className="text-lg font-bold text-pms-gray">{lifecycleData.employee.name}</h3>
+                      <h3 className="text-lg font-bold text-pms-gray">{lifecycleData?.employee?.name || 'Employee'}</h3>
                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">
-                        EMP-{lifecycleData.employee.id}
+                        EMP-{lifecycleData?.employee?.id || selectedEmployeeId}
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      <span className="font-semibold text-slate-700">{lifecycleData.employee.designation}</span> • {lifecycleData.employee.department}
+                      <span className="font-semibold text-slate-700">{lifecycleData?.employee?.designation || '-'}</span> • {lifecycleData?.employee?.department || '-'}
                     </p>
                     <p className="text-[11px] text-slate-400 mt-0.5 font-mono">
-                      {lifecycleData.employee.email} • Reporting to: <strong className="text-slate-600">{lifecycleData.employee.managerName}</strong>
+                      {lifecycleData?.employee?.email || ''} • Reporting to: <strong className="text-slate-600">{lifecycleData?.employee?.managerName || 'N/A'}</strong>
                     </p>
                   </div>
                 </div>
@@ -310,7 +512,7 @@ export const HrPmsLifecyclePage: React.FC = () => {
                       ? 'bg-pms-lightGreen text-pms-darkGreen border border-pms-green/20'
                       : 'bg-blue-50 text-blue-800 border border-blue-200'
                   }`}>
-                    {lifecycleData.cycleMonth || 'August 2026'}: {lifecycleData.status?.replace(/_/g, ' ') || 'ACTIVE'}
+                    {lifecycleData?.cycleMonth || 'August 2026'}: {lifecycleData?.status?.replace(/_/g, ' ') || 'ACTIVE'}
                   </span>
                 </div>
               </div>
@@ -322,7 +524,7 @@ export const HrPmsLifecyclePage: React.FC = () => {
                 </h4>
 
                 <div className="grid grid-cols-5 gap-2 relative">
-                  {lifecycleData.workflowStages.map((stage) => {
+                  {(lifecycleData?.workflowStages || []).map((stage) => {
                     const isDone = stage.status === 'Completed';
                     const isPending = stage.status === 'Pending' || stage.status === 'In Progress';
                     return (
@@ -349,99 +551,151 @@ export const HrPmsLifecyclePage: React.FC = () => {
               </div>
 
               {/* KPI Ratings & Evaluation Matrix Table */}
-              <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm overflow-hidden">
-                <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                    KPI Performance & Rating Details
-                  </h4>
-                  {lifecycleData.calculatedScore && (
-                    <span className="text-xs font-extrabold text-pms-darkGreen">
-                      Calculated Weighted Score: {lifecycleData.calculatedScore} / 5.00
-                    </span>
-                  )}
+              <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm overflow-hidden space-y-4 p-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-100">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      KPI Performance & Rating Details (HR Editable)
+                    </h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
+                      💡 HR can edit Employee Self Ratings, Employee Comments, Manager Comments, and evaluate 25% HR Parameters.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleSaveRatingsAndComments}
+                    disabled={savingRatings}
+                    className="px-5 py-2.5 bg-pms-green hover:bg-pms-darkGreen text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center space-x-2 shrink-0"
+                  >
+                    <Save size={15} />
+                    <span>{savingRatings ? 'Saving Changes...' : 'Save Ratings & Comments'}</span>
+                  </button>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-slate-150 text-left">
-                    <thead className="bg-slate-50">
-                      <tr>
-                        <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase">KPI Name</th>
-                        <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase text-center">Weight</th>
-                        <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase text-center">Self Rating</th>
-                        <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase text-center">Manager Rating</th>
-                        <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase text-center">HR Rating</th>
-                        <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase text-center">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 bg-white">
-                      {lifecycleData.kpis.map((kpi) => (
-                        <tr key={kpi.kpiId} className="hover:bg-slate-50/50">
-                          <td className="px-4 py-3">
-                            <p className="text-xs font-bold text-pms-gray">{kpi.kpiName}</p>
-                            <p className="text-[11px] text-slate-400">{kpi.description}</p>
-                            {kpi.comments && (
-                              <p className="text-[10px] text-slate-500 italic mt-1 bg-slate-50 p-1.5 rounded">
-                                Employee Note: "{kpi.comments}"
-                              </p>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-xs font-bold text-pms-darkGreen text-center">
-                            {kpi.weightage}%
-                          </td>
-                          <td className="px-4 py-3 text-xs font-bold text-center">
-                            {kpi.selfRating !== null ? (
-                              <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold">
-                                {kpi.selfRating.toFixed(1)}
+                <div className="space-y-6">
+                  {(lifecycleData?.kpis || []).map((kpi, idx) => {
+                    const isHr25 = isHrStandardKpiName(kpi.kpiName);
+                    return (
+                      <div key={kpi.kpiId} className="bg-slate-50/60 rounded-2xl border border-slate-200/80 p-5 space-y-4">
+                        {/* KPI Title & Rating Inputs Row */}
+                        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                          <div className="flex-1 space-y-1">
+                            <div className="flex items-center space-x-2">
+                              <span className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center justify-center">
+                                {idx + 1}
                               </span>
-                            ) : (
-                              <span className="text-slate-300">Pending</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-xs font-bold text-center">
-                            <div className="flex items-center justify-center space-x-1">
+                              <h5 className="text-sm font-bold text-slate-900">{kpi.kpiName}</h5>
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700">
+                                Weight: {kpi.weightage}%
+                              </span>
+                              {isHr25 && (
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-900 border border-purple-200">
+                                  25% HR Parameter
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-500 leading-relaxed">{kpi.description}</p>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-3 shrink-0">
+                            {/* Employee Self Rating Input */}
+                            <div className="bg-white p-2.5 rounded-xl border border-slate-200 text-center min-w-[100px]">
+                              <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                                Self Rating
+                              </label>
                               <input
                                 type="number"
                                 step="0.1"
-                                min="0.0"
-                                max="5.0"
-                                value={managerRatings[kpi.kpiId] !== undefined ? managerRatings[kpi.kpiId] : (kpi.managerRating ?? kpi.selfRating ?? 5.0)}
-                                onChange={(e) => {
-                                  const val = Math.min(5.0, Math.max(0.0, parseFloat(e.target.value) || 0));
-                                  handleManagerKpiRatingChange(kpi.kpiId, val);
-                                }}
-                                className="w-16 px-2 py-1 border-2 border-purple-300 rounded-lg text-xs font-extrabold text-center text-purple-700 bg-purple-50/80 focus:bg-white focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20 focus:outline-none transition-all shadow-xs"
+                                min="0"
+                                max="5"
+                                value={selfRatings[kpi.kpiId] !== undefined ? selfRatings[kpi.kpiId] : (kpi.selfRating ?? '')}
+                                onChange={(e) => setSelfRatings(prev => ({ ...prev, [kpi.kpiId]: Math.min(5, Math.max(0, parseFloat(e.target.value) || 0)) }))}
+                                placeholder="0.0"
+                                className="w-16 px-2 py-1 text-center font-extrabold text-xs border rounded-lg border-emerald-300 text-emerald-800 bg-emerald-50/50 focus:bg-white"
                               />
-                              <span className="text-[10px] text-slate-400 font-semibold">/ 5.0</span>
                             </div>
-                          </td>
-                          <td className="px-4 py-3 text-xs font-bold text-center">
-                            <div className="flex items-center justify-center space-x-1">
+
+                            {/* Manager Rating Input */}
+                            <div className={`p-2.5 rounded-xl border text-center min-w-[110px] ${isHr25 ? 'bg-purple-50/80 border-purple-200' : 'bg-white border-slate-200'}`}>
+                              <label className={`text-[9px] font-bold uppercase tracking-wider block mb-1 ${isHr25 ? 'text-purple-900' : 'text-slate-400'}`}>
+                                {isHr25 ? 'HR 25% Rating' : 'Manager Rating'}
+                              </label>
                               <input
                                 type="number"
                                 step="0.1"
-                                min="0.0"
-                                max="5.0"
-                                value={hrRatings[kpi.kpiId] !== undefined ? hrRatings[kpi.kpiId] : (kpi.hrRating ?? kpi.managerRating ?? kpi.selfRating ?? 5.0)}
-                                onChange={(e) => {
-                                  const val = Math.min(5.0, Math.max(0.0, parseFloat(e.target.value) || 0));
-                                  handleHrKpiRatingChange(kpi.kpiId, val);
-                                }}
-                                className="w-16 px-2 py-1 border-2 border-blue-300 rounded-lg text-xs font-extrabold text-center text-blue-700 bg-blue-50/80 focus:bg-white focus:border-pms-green focus:ring-2 focus:ring-pms-green/20 focus:outline-none transition-all shadow-xs"
+                                min="0"
+                                max="5"
+                                value={managerRatings[kpi.kpiId] !== undefined ? managerRatings[kpi.kpiId] : (kpi.managerRating ?? '')}
+                                onChange={(e) => setManagerRatings(prev => ({ ...prev, [kpi.kpiId]: Math.min(5, Math.max(0, parseFloat(e.target.value) || 0)) }))}
+                                placeholder="0.0"
+                                className={`w-16 px-2 py-1 text-center font-extrabold text-xs border rounded-lg ${isHr25 ? 'border-purple-300 text-purple-900 bg-purple-100/50' : 'border-purple-200 text-purple-700 bg-purple-50/30'} focus:bg-white`}
                               />
-                              <span className="text-[10px] text-slate-400 font-semibold">/ 5.0</span>
                             </div>
-                          </td>
-                          <td className="px-4 py-3 text-xs font-bold text-center">
-                            <span className={`px-2 py-0.5 rounded-full text-[9px] ${
-                              kpi.selfRating !== null ? 'bg-pms-lightGreen text-pms-darkGreen font-bold' : 'bg-slate-100 text-slate-400'
-                            }`}>
-                              {kpi.selfRating !== null ? 'RATED' : 'PENDING'}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+
+                            {/* HR Overall Rating Input */}
+                            <div className="bg-white p-2.5 rounded-xl border border-slate-200 text-center min-w-[100px]">
+                              <label className="text-[9px] font-bold text-blue-800 uppercase tracking-wider block mb-1">
+                                HR Final Rating
+                              </label>
+                              <input
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                max="5"
+                                value={hrRatings[kpi.kpiId] !== undefined ? hrRatings[kpi.kpiId] : (kpi.hrRating ?? '')}
+                                onChange={(e) => setHrRatings(prev => ({ ...prev, [kpi.kpiId]: Math.min(5, Math.max(0, parseFloat(e.target.value) || 0)) }))}
+                                placeholder="0.0"
+                                className="w-16 px-2 py-1 text-center font-extrabold text-xs border rounded-lg border-blue-300 text-blue-800 bg-blue-50/50 focus:bg-white"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Comments Section (Both Employee and Manager Comments Editable by HR) */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-200/60">
+                          {/* Employee Comments */}
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                              <span>Employee Self Comments / Evidence</span>
+                              <span className="text-[9px] text-slate-400 font-normal">(HR Editable)</span>
+                            </label>
+                            <textarea
+                              value={employeeCommentsMap[kpi.kpiId] ?? ''}
+                              onChange={(e) => setEmployeeCommentsMap(prev => ({ ...prev, [kpi.kpiId]: e.target.value }))}
+                              placeholder="Employee self assessment comments..."
+                              rows={2}
+                              className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-pms-green/40 focus:border-pms-green"
+                            />
+                          </div>
+
+                          {/* Manager Comments */}
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                              <span>Manager Feedback & Comments</span>
+                              <span className="text-[9px] text-slate-400 font-normal">(HR Editable)</span>
+                            </label>
+                            <textarea
+                              value={managerCommentsMap[kpi.kpiId] ?? ''}
+                              onChange={(e) => setManagerCommentsMap(prev => ({ ...prev, [kpi.kpiId]: e.target.value }))}
+                              placeholder="Manager feedback comments..."
+                              rows={2}
+                              className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-pms-green/40 focus:border-pms-green"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="pt-3 flex justify-end">
+                  <button
+                    onClick={handleSaveRatingsAndComments}
+                    disabled={savingRatings}
+                    className="px-6 py-2.5 bg-pms-green hover:bg-pms-darkGreen text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center space-x-2"
+                  >
+                    <Save size={16} />
+                    <span>{savingRatings ? 'Saving Changes...' : 'Save Ratings & Comments'}</span>
+                  </button>
                 </div>
               </div>
 

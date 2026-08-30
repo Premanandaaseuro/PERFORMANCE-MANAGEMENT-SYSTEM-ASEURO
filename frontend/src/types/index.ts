@@ -73,6 +73,7 @@ export interface Employee {
   managerName: string;
   joiningDate: string;
   accountStatus: string;
+  status?: string;
   role?: string;
   phone?: string;
   profilePhoto?: string;
@@ -87,6 +88,7 @@ export interface Kpi {
   managerRating: number | null;
   hrRating: number | null;
   comments: string | null;
+  managerComments?: string | null;
   ratingStatus: 'DRAFT' | 'SUBMITTED' | 'COMPLETED' | 'PENDING';
 }
 
@@ -142,6 +144,8 @@ export interface KpiMasterItem {
   kpiName: string;
   description: string;
   weightage: number;
+  selfRatingScale?: string;
+  managerRatingScale?: string;
   status: string;
 }
 
@@ -170,6 +174,8 @@ export interface LifecycleKpiDetail {
   managerRating: number | null;
   hrRating: number | null;
   comments: string | null;
+  employeeComments?: string | null;
+  managerComments?: string | null;
   ratingStatus: string;
   effectiveScore: number | null;
 }

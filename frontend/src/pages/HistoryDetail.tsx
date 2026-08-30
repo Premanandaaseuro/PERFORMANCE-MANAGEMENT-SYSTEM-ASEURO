@@ -23,6 +23,8 @@ import {
 } from 'lucide-react';
 import { reportApi } from '../api/reportApi';
 
+import { PmsHistory } from '../types';
+
 export const HistoryDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -30,10 +32,11 @@ export const HistoryDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [historyList, setHistoryList] = useState<PmsHistory[]>([]);
 
-  useEffect(() => {
-    if (!id) return;
-    pmsApi.getAssignmentDetail(Number(id))
+  const loadAssignment = (targetId: number) => {
+    setLoading(true);
+    pmsApi.getAssignmentDetail(targetId)
       .then((res) => {
         setAssignment(res);
         setLoading(false);
@@ -43,6 +46,15 @@ export const HistoryDetail: React.FC = () => {
         setError('Unable to load historical details for this appraisal cycle.');
         setLoading(false);
       });
+  };
+
+  useEffect(() => {
+    if (id) {
+      loadAssignment(Number(id));
+    }
+    pmsApi.getHistory()
+      .then(res => setHistoryList(res))
+      .catch(err => console.error(err));
   }, [id]);
 
   const handleDownload = async () => {
@@ -108,7 +120,29 @@ export const HistoryDetail: React.FC = () => {
           <span>Back to My Reports</span>
         </button>
         
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Previous Month / Cycle Selector */}
+          {historyList.length > 0 && (
+            <div className="flex items-center space-x-2 bg-white border border-slate-200 rounded-lg px-3 py-1.5 shadow-xs">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Select Month:</label>
+              <select
+                value={assignment.assignmentId}
+                onChange={(e) => {
+                  const targetId = Number(e.target.value);
+                  navigate(`/history/${targetId}`);
+                  loadAssignment(targetId);
+                }}
+                className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none"
+              >
+                {historyList.map((h) => (
+                  <option key={h.id} value={h.assignmentId || h.id}>
+                    {h.cycleMonth} (Score: {h.finalScore.toFixed(2)})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <button
             onClick={handleDownload}
             disabled={downloading}
@@ -248,51 +282,71 @@ export const HistoryDetail: React.FC = () => {
           <table className="min-w-full divide-y divide-slate-150">
             <thead className="bg-slate-50">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">KPI Description</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">KPI Description & Graph</th>
                 <th className="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider w-20">Weight</th>
                 <th className="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider w-24">Self Rating</th>
-                <th className="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider w-24">Manager Rating</th>
-                <th className="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider w-24">HR Rating</th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-purple-700 uppercase tracking-wider w-28">Manager & HR Rating</th>
                 <th className="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider w-24">Final score</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-slate-100 text-xs">
-              {assignment.kpis.map((kpi) => (
-                <tr key={kpi.kpiId} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-6 py-5">
-                    <p className="font-bold text-pms-gray text-sm">{kpi.kpiName}</p>
-                    <p className="text-slate-500 mt-1 leading-relaxed">{kpi.description}</p>
-                    {kpi.comments && (
-                      <p className="text-[11px] text-slate-500 mt-2 bg-slate-50 p-2 border border-slate-200/50 rounded italic">
-                        <strong>Self Comments:</strong> {kpi.comments}
-                      </p>
-                    )}
-                  </td>
-                  <td className="px-6 py-5 text-center font-bold text-pms-gray">{kpi.weightage}%</td>
-                  <td className="px-6 py-5 text-center font-semibold text-slate-500">{kpi.selfRating !== null ? kpi.selfRating.toFixed(1) : 'N/A'}</td>
-                  <td className="px-6 py-5 text-center font-semibold text-pms-darkGreen">{kpi.managerRating !== null ? kpi.managerRating.toFixed(1) : 'N/A'}</td>
-                  <td className="px-6 py-5 text-center font-semibold text-pms-green">
-                    {kpi.hrRating !== null
-                      ? kpi.hrRating.toFixed(1)
-                      : kpi.managerRating !== null
-                      ? kpi.managerRating.toFixed(1)
-                      : kpi.selfRating !== null
-                      ? kpi.selfRating.toFixed(1)
-                      : 'N/A'}
-                  </td>
-                  <td className="px-6 py-5 text-center">
-                    <span className="font-bold text-pms-gray bg-slate-100 border border-slate-200 px-2 py-0.5 rounded">
-                      {kpi.hrRating !== null
-                        ? kpi.hrRating.toFixed(1)
-                        : kpi.managerRating !== null
-                        ? kpi.managerRating.toFixed(1)
-                        : kpi.selfRating !== null
-                        ? kpi.selfRating.toFixed(1)
-                        : 'N/A'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
+              {assignment.kpis.map((kpi) => {
+                const effectiveRating = kpi.hrRating ?? kpi.managerRating ?? kpi.selfRating ?? 0;
+                return (
+                  <tr key={kpi.kpiId} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-6 py-5 space-y-2">
+                      <p className="font-bold text-pms-gray text-sm">{kpi.kpiName}</p>
+                      <p className="text-slate-500 leading-relaxed">{kpi.description}</p>
+                      
+                      {/* Per-KPI Score Bar Graph */}
+                      <div className="mt-2 p-2.5 bg-slate-50 border border-slate-200/80 rounded-xl space-y-1.5 max-w-lg">
+                        <div className="flex justify-between text-[10px] font-bold text-slate-600">
+                          <span>Evaluation Score Comparison Graph</span>
+                          <span className="text-pms-darkGreen">Effective: {effectiveRating.toFixed(1)} / 5.0</span>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-[9px] text-slate-500">
+                            <span>Self: {kpi.selfRating !== null ? kpi.selfRating.toFixed(1) : 'N/A'}</span>
+                            <span>Manager: {kpi.managerRating !== null ? kpi.managerRating.toFixed(1) : 'N/A'}</span>
+                            <span>HR: {kpi.hrRating !== null ? kpi.hrRating.toFixed(1) : 'N/A'}</span>
+                          </div>
+                          <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden flex">
+                            <div className="bg-blue-500 h-full" style={{ width: `${((kpi.selfRating || 0) / 5) * 100}%` }} title="Self Rating"></div>
+                            <div className="bg-purple-600 h-full" style={{ width: `${((kpi.managerRating || 0) / 5) * 100}%` }} title="Manager Rating"></div>
+                            <div className="bg-emerald-600 h-full" style={{ width: `${((kpi.hrRating || 0) / 5) * 100}%` }} title="HR Rating"></div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {kpi.comments && (
+                        <p className="text-[11px] text-slate-600 bg-slate-50 p-2 border border-slate-200/50 rounded italic">
+                          <strong>Self Comments:</strong> {kpi.comments}
+                        </p>
+                      )}
+                      {kpi.managerComments && (
+                        <p className="text-[11px] text-purple-950 bg-purple-50 p-2 border border-purple-200/60 rounded italic">
+                          <strong>Manager & HR Remarks:</strong> {kpi.managerComments}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-6 py-5 text-center font-bold text-pms-gray">{kpi.weightage}%</td>
+                    <td className="px-6 py-5 text-center font-semibold text-slate-500">{kpi.selfRating !== null ? kpi.selfRating.toFixed(1) : 'N/A'}</td>
+                    <td className="px-6 py-5 text-center font-semibold text-purple-700 bg-purple-50/40 border-x border-purple-100">
+                      <div>
+                        <span className="font-extrabold">{effectiveRating.toFixed(1)}</span>
+                        <span className="block text-[9px] text-purple-600 font-bold">
+                          {kpi.hrRating !== null ? '(HR Approved)' : kpi.managerRating !== null ? '(Manager Review)' : '(Self)'}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5 text-center">
+                      <span className="font-bold text-pms-gray bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg">
+                        {effectiveRating.toFixed(1)}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

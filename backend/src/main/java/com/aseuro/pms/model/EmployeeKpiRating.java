@@ -31,5 +31,8 @@ public class EmployeeKpiRating {
     @Column(columnDefinition = "TEXT")
     private String comments;
 
+    @Column(columnDefinition = "TEXT")
+    private String managerComments;
+
     private String status; // "DRAFT", "SUBMITTED"
 }

@@ -14,6 +14,8 @@ import {
   Award
 } from 'lucide-react';
 
+import { RatingScaleLegend } from '../../components/RatingScaleLegend';
+
 export const ManagerMyKpisPage: React.FC = () => {
   const [assignment, setAssignment] = useState<PmsAssignment | null>(null);
   const [ratings, setRatings] = useState<Record<number, { rating: number | ''; comments: string }>>({});
@@ -22,14 +24,21 @@ export const ManagerMyKpisPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  const [historyList, setHistoryList] = useState<any[]>([]);
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<number | null>(null);
+
   useEffect(() => {
     fetchAssignment();
+    apiClient.get('/employee/pms/history')
+      .then(res => setHistoryList(res.data))
+      .catch(err => console.error(err));
   }, []);
 
-  const fetchAssignment = async () => {
+  const fetchAssignment = async (assignmentId?: number) => {
     try {
       setLoading(true);
-      const res = await apiClient.get<PmsAssignment>('/employee/pms/current');
+      const url = assignmentId ? `/employee/pms/${assignmentId}` : '/employee/pms/current';
+      const res = await apiClient.get<PmsAssignment>(url);
       setAssignment(res.data);
 
       const initialRatings: Record<number, { rating: number | ''; comments: string }> = {};
@@ -45,7 +54,7 @@ export const ManagerMyKpisPage: React.FC = () => {
       setError(null);
     } catch (err: any) {
       console.error('Failed to load manager assignment', err);
-      setError('Unable to load your active PMS assignment.');
+      setError('Unable to load your PMS assignment.');
     } finally {
       setLoading(false);
     }
@@ -169,7 +178,7 @@ export const ManagerMyKpisPage: React.FC = () => {
           <p className="font-medium">{error}</p>
         </div>
         <button
-          onClick={fetchAssignment}
+          onClick={() => fetchAssignment()}
           className="px-4 py-2 bg-rose-600 text-white rounded-xl text-sm font-semibold hover:bg-rose-700 transition-colors"
         >
           Retry
@@ -189,11 +198,42 @@ export const ManagerMyKpisPage: React.FC = () => {
           </div>
           <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">View My KPIs</h1>
           <p className="text-slate-500 text-sm mt-1">
-            Complete your self-assessment ratings (0.0 - 5.0) and submit for appraisal review.
+            Complete your self-assessment ratings (0.0 - 5.0), inspect past months' reports, and submit for appraisal review.
           </p>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Past Months Cycle Selector */}
+          {historyList.length > 0 && (
+            <div className="bg-slate-50 border border-slate-200/80 px-4 py-2.5 rounded-2xl">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                Past Months Reports
+              </label>
+              <select
+                value={selectedAssignmentId || 'CURRENT'}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === 'CURRENT') {
+                    setSelectedAssignmentId(null);
+                    fetchAssignment();
+                  } else {
+                    const idNum = Number(val);
+                    setSelectedAssignmentId(idNum);
+                    fetchAssignment(idNum);
+                  }
+                }}
+                className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none"
+              >
+                <option value="CURRENT">Current Active Cycle ({assignment?.cycleMonth || 'August 2026'})</option>
+                {historyList.map((h: any) => (
+                  <option key={h.id} value={h.assignmentId || h.id}>
+                    {h.cycleMonth} (Score: {h.finalScore.toFixed(2)} - {h.grade})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="bg-slate-50 border border-slate-200/80 px-5 py-3 rounded-2xl text-right">
             <span className="text-xs font-bold text-slate-400 uppercase block">Weighted Score</span>
             <span className="text-2xl font-black text-pms-darkGreen">
@@ -230,6 +270,9 @@ export const ManagerMyKpisPage: React.FC = () => {
           <span>{error}</span>
         </div>
       )}
+
+      {/* Rating Scale Legend Guide */}
+      <RatingScaleLegend defaultExpanded={true} />
 
       {/* KPI Cards / List */}
       <div className="space-y-4">

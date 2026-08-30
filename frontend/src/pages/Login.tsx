@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { authApi } from '../api/authApi';
 import aseuroLogo from '../assets/aseuro-logo.png';
 import {
   Mail,
@@ -12,7 +13,13 @@ import {
   AlertCircle,
   UserCheck,
   Users,
-  ShieldCheck
+  ShieldCheck,
+  X,
+  KeyRound,
+  CheckCircle2,
+  Clock,
+  ShieldAlert,
+  RotateCcw
 } from 'lucide-react';
 
 export const Login: React.FC = () => {
@@ -24,6 +31,55 @@ export const Login: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Lockout State (5 failed attempts -> 5 minutes lock)
+  const [lockSecondsRemaining, setLockSecondsRemaining] = useState<number>(0);
+
+  useEffect(() => {
+    if (lockSecondsRemaining <= 0) return;
+
+    const timer = setInterval(() => {
+      setLockSecondsRemaining((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [lockSecondsRemaining]);
+
+  const formatLockTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const handleSkipLockTimer = async () => {
+    try {
+      if (email) {
+        await authApi.resetLockout(email.trim());
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLockSecondsRemaining(0);
+      setError(null);
+    }
+  };
+
+  // Forgot Password Modal State
+  const [forgotPasswordModalOpen, setForgotPasswordModalOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetSuccess, setResetSuccess] = useState<string | null>(null);
+  const [resetLoading, setResetLoading] = useState(false);
 
   const handleRoleChange = (newRole: 'EMPLOYEE' | 'MANAGER' | 'HR') => {
     setRole(newRole);
@@ -40,8 +96,69 @@ export const Login: React.FC = () => {
     }
   };
 
+  const handleOpenForgotPassword = () => {
+    setResetEmail(email || '');
+    setNewPassword('');
+    setConfirmPassword('');
+    setResetError(null);
+    setResetSuccess(null);
+    setForgotPasswordModalOpen(true);
+  };
+
+  const handleResetPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetError(null);
+    setResetSuccess(null);
+
+    if (!resetEmail.trim() || !newPassword || !confirmPassword) {
+      const msg = 'Please fill in all fields.';
+      setResetError(msg);
+      alert(msg);
+      return;
+    }
+
+    // Password criteria check: alphabets, numbers, and special characters
+    const hasAlphabet = /[a-zA-Z]/.test(newPassword);
+    const hasNumber = /[0-9]/.test(newPassword);
+    const hasSpecialChar = /[^a-zA-Z0-9]/.test(newPassword);
+
+    if (!hasAlphabet || !hasNumber || !hasSpecialChar) {
+      const msg = 'Password should meet the criteria: alphabets, numbers, and special characters.';
+      setResetError(msg);
+      alert(msg);
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      const msg = 'Passwords do not match.';
+      setResetError(msg);
+      alert(msg);
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      await authApi.resetPassword(resetEmail.trim(), newPassword);
+      const successMsg = 'Password changed successfully.';
+      setResetSuccess(successMsg);
+      alert(successMsg);
+      setPassword(newPassword);
+      setForgotPasswordModalOpen(false);
+    } catch (err: any) {
+      console.error(err);
+      const errorMsg = err.response?.data?.message || err.message || 'Failed to change password.';
+      setResetError(errorMsg);
+      alert(errorMsg);
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (lockSecondsRemaining > 0) {
+      return;
+    }
     if (!email || !password) {
       setError('Please fill in all fields.');
       return;
@@ -65,8 +182,12 @@ export const Login: React.FC = () => {
       }
     } catch (err: any) {
       console.error(err);
-      if (err.response && err.response.data && err.response.data.message) {
-        setError(err.response.data.message);
+      const resData = err.response?.data;
+      if (resData?.lockedUntilSeconds) {
+        setLockSecondsRemaining(resData.lockedUntilSeconds);
+      }
+      if (resData?.message) {
+        setError(resData.message);
       } else if (err.message) {
         setError(err.message);
       } else {
@@ -212,8 +333,40 @@ export const Login: React.FC = () => {
 
             {/* Form */}
             <form className="w-full space-y-4" onSubmit={handleSubmit}>
+              {/* Lock Countdown Banner */}
+              {lockSecondsRemaining > 0 && (
+                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-300 flex flex-col items-center justify-center space-y-2 text-amber-900 animate-fadeIn">
+                  <div className="flex items-center space-x-2">
+                    <ShieldAlert size={20} className="text-amber-600 animate-pulse" />
+                    <span className="font-extrabold text-xs uppercase tracking-wide text-amber-800">Account Temporarily Locked</span>
+                  </div>
+                  <p className="text-xs text-center font-medium text-amber-700">
+                    5 failed login attempts detected. Please wait for the 5-minute timer before trying again.
+                  </p>
+                  <div className="flex items-center space-x-3 mt-1">
+                    <div className="flex items-center space-x-2 bg-white px-4 py-1.5 rounded-xl border border-amber-200 shadow-xs">
+                      <Clock size={16} className="text-amber-600" />
+                      <span className="text-sm font-black font-mono text-amber-900">
+                        {formatLockTime(lockSecondsRemaining)}
+                      </span>
+                    </div>
+
+                    {/* Developer Reset Timer Button */}
+                    <button
+                      type="button"
+                      onClick={handleSkipLockTimer}
+                      className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center space-x-1 hover:scale-105 active:scale-95"
+                      title="Developer Shortcut: Skip 5-minute waiting timer"
+                    >
+                      <RotateCcw size={13} />
+                      <span>Reset Timer</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Error Alert */}
-              {error && (
+              {error && lockSecondsRemaining <= 0 && (
                 <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 flex items-center space-x-2 text-xs font-semibold text-rose-800 animate-fadeIn">
                   <AlertCircle size={16} className="text-rose-600 shrink-0" />
                   <span>{error}</span>
@@ -231,7 +384,8 @@ export const Login: React.FC = () => {
                     placeholder="Enter your email address"
                     autoComplete="email"
                     required
-                    className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
+                    disabled={lockSecondsRemaining > 0}
+                    className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all disabled:bg-slate-100 disabled:opacity-70"
                   />
                 </div>
               </div>
@@ -247,7 +401,8 @@ export const Login: React.FC = () => {
                     placeholder="Enter your password"
                     autoComplete="current-password"
                     required
-                    className="w-full pl-11 pr-16 py-3.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
+                    disabled={lockSecondsRemaining > 0}
+                    className="w-full pl-11 pr-16 py-3.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all disabled:bg-slate-100 disabled:opacity-70"
                   />
                   <button
                     type="button"
@@ -261,7 +416,7 @@ export const Login: React.FC = () => {
                 <div className="text-right mt-2">
                   <button
                     type="button"
-                    onClick={() => alert('Default passwords:\n• HR: Hr@12345\n• Manager / Employee: password')}
+                    onClick={handleOpenForgotPassword}
                     className="text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline"
                   >
                     Forgot password?
@@ -272,11 +427,15 @@ export const Login: React.FC = () => {
               {/* Login Submit Button */}
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-bold text-sm shadow-lg shadow-emerald-600/30 transition-all transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-between disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none mt-2"
+                disabled={loading || lockSecondsRemaining > 0}
+                className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-bold text-sm shadow-lg shadow-emerald-600/30 transition-all transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none mt-2"
               >
                 <span className="mx-auto pl-4">
-                  {loading ? 'Authenticating...' : 'Login'}
+                  {loading
+                    ? 'Authenticating...'
+                    : lockSecondsRemaining > 0
+                    ? `Account Locked (${formatLockTime(lockSecondsRemaining)})`
+                    : 'Login'}
                 </span>
                 <ArrowRight size={18} />
               </button>
@@ -285,6 +444,141 @@ export const Login: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Forgot Password / Reset Password Modal */}
+      {forgotPasswordModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-100 relative animate-scaleUp">
+            
+            {/* Close Button */}
+            <button
+              onClick={() => setForgotPasswordModalOpen(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 p-2 rounded-full transition-all"
+            >
+              <X size={18} />
+            </button>
+
+            {/* Header Icon & Title */}
+            <div className="flex items-center space-x-3 mb-2">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                <KeyRound size={20} />
+              </div>
+              <div>
+                <h3 className="text-xl font-extrabold text-slate-900 tracking-tight">Reset Password</h3>
+                <p className="text-xs text-slate-500 font-medium">Create and confirm your new account password</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleResetPasswordSubmit} className="mt-6 space-y-4">
+              {/* Reset Error Alert */}
+              {resetError && (
+                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 flex items-start space-x-2 text-xs font-semibold text-rose-800 animate-fadeIn">
+                  <AlertCircle size={16} className="text-rose-600 shrink-0 mt-0.5" />
+                  <span>{resetError}</span>
+                </div>
+              )}
+
+              {/* Reset Success Alert */}
+              {resetSuccess && (
+                <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center space-x-2 text-xs font-semibold text-emerald-800 animate-fadeIn">
+                  <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                  <span>{resetSuccess}</span>
+                </div>
+              )}
+
+              {/* Email Address */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
+                <div className="relative flex items-center">
+                  <Mail size={16} className="absolute left-3.5 text-slate-400 pointer-events-none" />
+                  <input
+                    type="email"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    placeholder="enter your email"
+                    required
+                    className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* New Password Input */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">New Password</label>
+                <div className="relative flex items-center">
+                  <Lock size={16} className="absolute left-3.5 text-amber-500 pointer-events-none" />
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Create new password"
+                    required
+                    className="w-full pl-10 pr-16 py-3 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3.5 text-xs font-bold text-emerald-600 hover:text-emerald-700"
+                  >
+                    {showNewPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Confirm Password Input */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Confirm New Password</label>
+                <div className="relative flex items-center">
+                  <Lock size={16} className="absolute left-3.5 text-amber-500 pointer-events-none" />
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Confirm new password"
+                    required
+                    className="w-full pl-10 pr-16 py-3 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3.5 text-xs font-bold text-emerald-600 hover:text-emerald-700"
+                  >
+                    {showConfirmPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Criteria Info box */}
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-600 space-y-1 font-medium">
+                <p className="font-bold text-slate-700">Password Criteria Required:</p>
+                <ul className="list-disc list-inside space-y-0.5 text-slate-500">
+                  <li className={/[a-zA-Z]/.test(newPassword) ? 'text-emerald-600 font-bold' : ''}>Alphabets (a-z, A-Z)</li>
+                  <li className={/[0-9]/.test(newPassword) ? 'text-emerald-600 font-bold' : ''}>Numbers (0-9)</li>
+                  <li className={/[^a-zA-Z0-9]/.test(newPassword) ? 'text-emerald-600 font-bold' : ''}>Special Characters (!@#$%^&*...)</li>
+                </ul>
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="flex items-center space-x-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setForgotPasswordModalOpen(false)}
+                  className="flex-1 py-3 px-4 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={resetLoading}
+                  className="flex-1 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all disabled:opacity-50"
+                >
+                  {resetLoading ? 'Changing...' : 'Change Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Bottom Wave Vector Baseline */}
       <div className="absolute bottom-0 left-0 right-0 h-28 pointer-events-none z-0 opacity-90 overflow-hidden">

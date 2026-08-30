@@ -16,6 +16,20 @@ import {
   FileText
 } from 'lucide-react';
 
+import { RatingScaleLegend, RATING_DEFINITIONS } from '../../components/RatingScaleLegend';
+
+const isHrStandardKpiName = (name: string): boolean => {
+  if (!name) return false;
+  const n = name.trim().toLowerCase();
+  return (
+    n.includes('leave pattern') ||
+    n.includes('team collaboration') ||
+    n.includes('punctuality') ||
+    n.includes('new initiatives') ||
+    n.includes('rewards')
+  );
+};
+
 export const ManagerKpiReviewPage: React.FC = () => {
   const { employeeId } = useParams<{ employeeId: string }>();
   const navigate = useNavigate();
@@ -245,6 +259,9 @@ export const ManagerKpiReviewPage: React.FC = () => {
         </div>
       )}
 
+      {/* Performance Rating Scale Guide */}
+      <RatingScaleLegend defaultExpanded={true} />
+
       {/* KPI Evaluation Matrix */}
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -273,7 +290,7 @@ export const ManagerKpiReviewPage: React.FC = () => {
                   <p className="text-slate-500 text-sm leading-relaxed">{kpi.description}</p>
                 </div>
 
-                <div className="flex items-center gap-4 shrink-0">
+                <div className="flex flex-col sm:flex-row items-center gap-4 shrink-0">
                   {/* Employee Self Rating Display */}
                   <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 text-center min-w-[110px]">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Self Rating</span>
@@ -282,27 +299,63 @@ export const ManagerKpiReviewPage: React.FC = () => {
                     </span>
                   </div>
 
-                  {/* Manager Rating Input */}
-                  <div className="bg-emerald-50/60 p-4 rounded-2xl border border-emerald-200 text-center min-w-[130px]">
-                    <label className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block mb-1">
-                      Manager Rating
-                    </label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="5"
-                      disabled={isLocked || submitting}
-                      value={currentRating}
-                      onChange={(e) => handleRatingChange(kpi.kpiId, e.target.value)}
-                      placeholder="0.0"
-                      className={`w-20 px-2 py-1.5 text-center text-lg font-black rounded-xl border ${
-                        isLocked
-                          ? 'bg-white/80 text-slate-600 border-slate-200 cursor-not-allowed'
-                          : 'bg-white text-pms-darkGreen border-emerald-300 focus:ring-2 focus:ring-pms-green'
-                      }`}
-                    />
-                  </div>
+                  {/* Manager Rating Input / HR 25% Badge */}
+                  {isHrStandardKpiName(kpi.kpiName) ? (
+                    <div className="bg-purple-50/70 p-4 rounded-2xl border border-purple-200 text-center space-y-1 min-w-[160px]">
+                      <span className="text-[10px] font-extrabold text-purple-900 uppercase tracking-wider block">
+                        25% HR Parameter
+                      </span>
+                      <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-900 border border-purple-200 inline-block">
+                        {currentRating !== '' ? `${Number(currentRating).toFixed(1)} / 5.0` : 'Evaluated by HR'}
+                      </span>
+                      <span className="text-[9px] text-purple-600 font-medium block">Standardized HR Rating KPI</span>
+                    </div>
+                  ) : (
+                    <div className="bg-emerald-50/60 p-4 rounded-2xl border border-emerald-200 text-center space-y-2">
+                      <label className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
+                        Manager Rating (0.0 - 5.0)
+                      </label>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="5"
+                          disabled={isLocked || submitting}
+                          value={currentRating}
+                          onChange={(e) => handleRatingChange(kpi.kpiId, e.target.value)}
+                          placeholder="0.0"
+                          className={`w-20 px-2 py-1.5 text-center text-lg font-black rounded-xl border ${
+                            isLocked
+                              ? 'bg-white/80 text-slate-600 border-slate-200 cursor-not-allowed'
+                              : 'bg-white text-pms-darkGreen border-emerald-300 focus:ring-2 focus:ring-pms-green'
+                          }`}
+                        />
+                        {!isLocked && (
+                          <div className="flex space-x-1">
+                            {[1, 2, 3, 4, 5].map((num) => {
+                              const def = RATING_DEFINITIONS[num - 1];
+                              return (
+                                <button
+                                  key={num}
+                                  type="button"
+                                  onClick={() => handleRatingChange(kpi.kpiId, num.toString())}
+                                  title={`${num}: ${def.label} - ${def.shortDesc}`}
+                                  className={`px-2 py-1 text-xs font-bold border rounded-lg transition-all ${
+                                    currentRating === num
+                                      ? 'bg-pms-green text-white border-pms-green shadow-xs'
+                                      : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200'
+                                  }`}
+                                >
+                                  {num}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

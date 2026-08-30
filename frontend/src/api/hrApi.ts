@@ -23,6 +23,11 @@ export const hrApi = {
     return response.data;
   },
 
+  createDesignation: async (name: string, description?: string): Promise<{ id: number; name: string; message: string }> => {
+    const response = await apiClient.post<{ id: number; name: string; message: string }>('/api/hr/designations', { name, description });
+    return response.data;
+  },
+
   getManagers: async (): Promise<ManagerOption[]> => {
     const response = await apiClient.get<ManagerOption[]>('/api/hr/managers');
     return response.data;
@@ -66,12 +71,12 @@ export const hrApi = {
     return response.data;
   },
 
-  createKpi: async (data: { designation: string; kpiName: string; description: string; weightage: number }): Promise<KpiMasterItem> => {
+  createKpi: async (data: { designation: string; kpiName: string; description: string; weightage: number; selfRatingScale?: string; managerRatingScale?: string }): Promise<KpiMasterItem> => {
     const response = await apiClient.post<KpiMasterItem>('/api/hr/kpis', data);
     return response.data;
   },
 
-  updateKpi: async (id: number, data: { kpiName: string; description: string; weightage: number; status?: string }): Promise<KpiMasterItem> => {
+  updateKpi: async (id: number, data: { kpiName: string; description: string; weightage: number; selfRatingScale?: string; managerRatingScale?: string; status?: string }): Promise<KpiMasterItem> => {
     const response = await apiClient.put<KpiMasterItem>(`/api/hr/kpis/${id}`, data);
     return response.data;
   },
@@ -89,6 +94,23 @@ export const hrApi = {
 
   getLifecycleDetail: async (employeeId: number): Promise<EmployeeLifecycleData> => {
     const response = await apiClient.get<EmployeeLifecycleData>(`/api/hr/lifecycle/${employeeId}`);
+    return response.data;
+  },
+
+  updateLifecycleRatings: async (
+    assignmentId: number,
+    data: {
+      kpiRatings: Array<{
+        kpiId: number;
+        selfRating?: number | null;
+        employeeComments?: string;
+        managerRating?: number | null;
+        managerComments?: string;
+        hrRating?: number | null;
+      }>;
+    }
+  ): Promise<{ message: string; updatedCount: number }> => {
+    const response = await apiClient.put<{ message: string; updatedCount: number }>(`/api/hr/lifecycle/${assignmentId}/ratings`, data);
     return response.data;
   },
 

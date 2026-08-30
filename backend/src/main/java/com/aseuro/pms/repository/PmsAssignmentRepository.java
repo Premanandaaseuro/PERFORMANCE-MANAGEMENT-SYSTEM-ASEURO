@@ -14,5 +14,6 @@ public interface PmsAssignmentRepository extends JpaRepository<PmsAssignment, Lo
     List<PmsAssignment> findByEmployee(Employee employee);
     Optional<PmsAssignment> findByEmployeeAndCycleMonth(Employee employee, String cycleMonth);
     Optional<PmsAssignment> findFirstByEmployeeOrderByStartDateDesc(Employee employee);
+    Optional<PmsAssignment> findFirstByEmployeeOrderByIdDesc(Employee employee);
     List<PmsAssignment> findByEmployeeAndStatusNot(Employee employee, PMSState status);
 }

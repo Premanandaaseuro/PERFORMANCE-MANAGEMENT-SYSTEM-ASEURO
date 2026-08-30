@@ -32,6 +32,12 @@ public class KpiMaster {
     @Column(nullable = false)
     private Double weightage;
 
+    @Column(name = "self_rating_scale")
+    private String selfRatingScale;
+
+    @Column(name = "manager_rating_scale")
+    private String managerRatingScale;
+
     @Column(nullable = false)
     @Builder.Default
     private String status = "ACTIVE";

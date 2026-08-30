@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { pmsApi, KpiRatingRequest } from '../api/pmsApi';
-import { PmsAssignment, Kpi } from '../types';
+import { PmsAssignment, Kpi, PmsHistory } from '../types';
 import { StatusBadge } from '../components/StatusBadge';
 import {
   Save,
@@ -14,6 +14,8 @@ import {
   FileCheck,
   ChevronRight
 } from 'lucide-react';
+
+import { RatingScaleLegend, RATING_DEFINITIONS } from '../components/RatingScaleLegend';
 
 export const MyKpis: React.FC = () => {
   const navigate = useNavigate();
@@ -31,11 +33,18 @@ export const MyKpis: React.FC = () => {
   const [submitModalOpen, setSubmitModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchAssignment = () => {
-    pmsApi.getCurrentAssignment()
+  const [historyList, setHistoryList] = useState<PmsHistory[]>([]);
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<number | null>(null);
+
+  const fetchAssignment = (assignmentId?: number) => {
+    setLoading(true);
+    const fetchCall = assignmentId
+      ? pmsApi.getAssignmentDetail(assignmentId)
+      : pmsApi.getCurrentAssignment();
+
+    fetchCall
       .then((res) => {
         setAssignment(res);
-        // Load initial ratings and comments
         const initialRatings: Record<number, number | null> = {};
         const initialComments: Record<number, string> = {};
         res.kpis.forEach((kpi) => {
@@ -55,6 +64,9 @@ export const MyKpis: React.FC = () => {
 
   useEffect(() => {
     fetchAssignment();
+    pmsApi.getHistory()
+      .then(res => setHistoryList(res))
+      .catch(err => console.error(err));
   }, []);
 
   if (loading) {
@@ -236,13 +248,44 @@ export const MyKpis: React.FC = () => {
           </p>
         </div>
 
-        {/* Read-only Lock Indicator */}
-        {isReadOnly && (
-          <div className="flex items-center space-x-2 px-3.5 py-2 bg-slate-50 border border-slate-200 text-slate-500 text-xs font-semibold rounded-lg self-start md:self-auto shadow-inner">
-            <Lock size={15} className="text-slate-400" />
-            <span>SUBMITTED / LOCKED</span>
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Previous Month / Cycle Selector */}
+          {historyList.length > 0 && (
+            <div className="flex items-center space-x-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cycle:</label>
+              <select
+                value={selectedAssignmentId || 'CURRENT'}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === 'CURRENT') {
+                    setSelectedAssignmentId(null);
+                    fetchAssignment();
+                  } else {
+                    const idNum = Number(val);
+                    setSelectedAssignmentId(idNum);
+                    fetchAssignment(idNum);
+                  }
+                }}
+                className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none"
+              >
+                <option value="CURRENT">Current Active Cycle ({assignment.cycleMonth})</option>
+                {historyList.map((h) => (
+                  <option key={h.id} value={h.assignmentId || h.id}>
+                    {h.cycleMonth} (Score: {h.finalScore.toFixed(2)} - {h.grade})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Read-only Lock Indicator */}
+          {isReadOnly && (
+            <div className="flex items-center space-x-2 px-3.5 py-2 bg-slate-50 border border-slate-200 text-slate-500 text-xs font-semibold rounded-lg shadow-inner">
+              <Lock size={15} className="text-slate-400" />
+              <span>SUBMITTED / LOCKED</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* KPI Summary Banner */}
@@ -290,6 +333,9 @@ export const MyKpis: React.FC = () => {
           <span className="text-xs font-semibold">{error}</span>
         </div>
       )}
+
+      {/* Rating Scale Legend Guide */}
+      <RatingScaleLegend defaultExpanded={true} />
 
       {/* Main KPI list (Table for Desktop, Cards for Mobile) */}
       <div className="bg-white border border-slate-200/60 rounded-xl overflow-hidden shadow-sm">
@@ -351,19 +397,23 @@ export const MyKpis: React.FC = () => {
 
                             {/* Simple Quick Scale Buttons */}
                             <div className="flex space-x-1">
-                              {[1, 2, 3, 4, 5].map((num) => (
-                                <button
-                                  key={num}
-                                  type="button"
-                                  onClick={() => handleRatingChange(kpi.kpiId, num)}
-                                  className={`px-2.5 py-1.5 text-xs font-bold border rounded transition-all ${currentRating === num
-                                    ? 'bg-pms-green text-white border-pms-green shadow-sm'
-                                    : 'bg-white hover:bg-slate-50 text-slate-500 border-slate-200'
-                                    }`}
-                                >
-                                  {num}
-                                </button>
-                              ))}
+                              {[1, 2, 3, 4, 5].map((num) => {
+                                const def = RATING_DEFINITIONS[num - 1];
+                                return (
+                                  <button
+                                    key={num}
+                                    type="button"
+                                    onClick={() => handleRatingChange(kpi.kpiId, num)}
+                                    title={`${num}: ${def.label} - ${def.shortDesc}`}
+                                    className={`px-2.5 py-1.5 text-xs font-bold border rounded transition-all ${currentRating === num
+                                      ? 'bg-pms-green text-white border-pms-green shadow-sm'
+                                      : 'bg-white hover:bg-slate-50 text-slate-500 border-slate-200'
+                                      }`}
+                                  >
+                                    {num}
+                                  </button>
+                                );
+                              })}
                             </div>
                           </div>
                           {ratingError && (
@@ -377,7 +427,7 @@ export const MyKpis: React.FC = () => {
                     </td>
 
                     {/* Comments Area */}
-                    <td className="px-6 py-6">
+                    <td className="px-6 py-6 space-y-2">
                       {isReadOnly ? (
                         <p className="text-xs text-slate-500 bg-slate-50 p-2.5 border border-slate-100 rounded-lg italic leading-relaxed min-h-[40px]">
                           {comments[kpi.kpiId] || 'No comments entered.'}
@@ -396,6 +446,60 @@ export const MyKpis: React.FC = () => {
                           </span>
                         </div>
                       )}
+
+                      {/* Display Manager & HR Feedback and Graphical Progress Bar */}
+                      <div className="mt-3 p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wider">
+                            Manager & HR Evaluation Graph
+                          </span>
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            Effective Score: {((kpi.hrRating ?? kpi.managerRating ?? kpi.selfRating ?? 0)).toFixed(1)} / 5.0
+                          </span>
+                        </div>
+
+                        {/* Per-KPI Score Bar Comparison */}
+                        <div className="space-y-1.5 pt-1">
+                          {/* Self Rating Bar */}
+                          <div>
+                            <div className="flex justify-between text-[10px] text-slate-500 font-bold mb-0.5">
+                              <span>Self Rating</span>
+                              <span>{kpi.selfRating !== null ? kpi.selfRating.toFixed(1) : 'N/A'} / 5.0</span>
+                            </div>
+                            <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                              <div className="bg-blue-500 h-full rounded-full transition-all" style={{ width: `${((kpi.selfRating || 0) / 5) * 100}%` }}></div>
+                            </div>
+                          </div>
+
+                          {/* Manager Rating Bar */}
+                          <div>
+                            <div className="flex justify-between text-[10px] text-purple-700 font-bold mb-0.5">
+                              <span>Manager Rating</span>
+                              <span>{kpi.managerRating !== null ? kpi.managerRating.toFixed(1) : 'Pending Review'}</span>
+                            </div>
+                            <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                              <div className="bg-purple-600 h-full rounded-full transition-all" style={{ width: `${((kpi.managerRating || 0) / 5) * 100}%` }}></div>
+                            </div>
+                          </div>
+
+                          {/* HR Rating Bar */}
+                          <div>
+                            <div className="flex justify-between text-[10px] text-emerald-700 font-bold mb-0.5">
+                              <span>HR Rating (Final)</span>
+                              <span>{kpi.hrRating !== null ? kpi.hrRating.toFixed(1) : (kpi.managerRating !== null ? kpi.managerRating.toFixed(1) : 'Pending')}</span>
+                            </div>
+                            <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                              <div className="bg-emerald-600 h-full rounded-full transition-all" style={{ width: `${(((kpi.hrRating ?? kpi.managerRating) || 0) / 5) * 100}%` }}></div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {kpi.managerComments && (
+                          <div className="mt-2 text-[11px] text-purple-950 font-medium italic bg-purple-50 p-2 rounded-lg border border-purple-200/60">
+                            <strong>Manager/HR Remarks:</strong> "{kpi.managerComments}"
+                          </div>
+                        )}
+                      </div>
                     </td>
 
                     {/* StatusBadge column */}

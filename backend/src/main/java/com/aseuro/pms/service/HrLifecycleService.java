@@ -53,20 +53,25 @@ public class HrLifecycleService {
             ).collect(Collectors.toList());
         }
 
-        return list.stream().map(e -> EmployeeDto.builder()
-                .id(e.getId())
-                .name(e.getName())
-                .email(e.getEmail())
-                .department(e.getDepartment() != null ? e.getDepartment() : "-")
-                .team(e.getTeam() != null ? e.getTeam() : "-")
-                .designation(e.getDesignation() != null ? e.getDesignation() : "-")
-                .managerName(e.getManager() != null ? e.getManager().getName() : "-")
-                .joiningDate(e.getJoiningDate())
-                .accountStatus(e.getAccountStatus() != null ? e.getAccountStatus() : "ACTIVE")
-                .phone(e.getPhone())
-                .profilePhoto(e.getProfilePhoto())
-                .build()
-        ).collect(Collectors.toList());
+        return list.stream().map(e -> {
+            Optional<PmsAssignment> assignOpt = pmsAssignmentRepository.findFirstByEmployeeOrderByIdDesc(e);
+            String pmsState = assignOpt.map(a -> a.getStatus().name()).orElse("SELF_ASSESSMENT_DRAFT");
+
+            return EmployeeDto.builder()
+                    .id(e.getId())
+                    .name(e.getName())
+                    .email(e.getEmail())
+                    .department(e.getDepartment() != null ? e.getDepartment() : "-")
+                    .team(e.getTeam() != null ? e.getTeam() : "-")
+                    .designation(e.getDesignation() != null ? e.getDesignation() : "-")
+                    .managerName(e.getManager() != null ? e.getManager().getName() : "-")
+                    .joiningDate(e.getJoiningDate())
+                    .accountStatus(e.getAccountStatus() != null ? e.getAccountStatus() : "ACTIVE")
+                    .status(pmsState)
+                    .phone(e.getPhone())
+                    .profilePhoto(e.getProfilePhoto())
+                    .build();
+        }).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
@@ -143,6 +148,8 @@ public class HrLifecycleService {
             km.put("managerRating", r != null ? r.getManagerRating() : null);
             km.put("hrRating", hrRating);
             km.put("comments", r != null ? r.getComments() : null);
+            km.put("employeeComments", r != null ? r.getComments() : null);
+            km.put("managerComments", r != null ? r.getManagerComments() : null);
             km.put("ratingStatus", r != null ? r.getStatus() : "PENDING");
 
             // Final score contribution
@@ -303,6 +310,109 @@ public class HrLifecycleService {
                 "finalScore", finalScore,
                 "grade", grade,
                 "status", "COMPLETED"
+        );
+    }
+
+    @Transactional
+    public Map<String, Object> updateKpiRatingsAndComments(Long assignmentId, HrUpdateKpiRatingsRequest request) {
+        PmsAssignment assignment = pmsAssignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "PMS Assignment not found"));
+
+        if (request.getKpiRatings() == null || request.getKpiRatings().isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "KPI ratings update list cannot be empty.");
+        }
+
+        List<PmsKpi> kpis = pmsKpiRepository.findByAssignment(assignment);
+        List<EmployeeKpiRating> existingRatings = employeeKpiRatingRepository.findByAssignment(assignment);
+
+        for (HrUpdateKpiRatingsRequest.HrKpiRatingUpdateEntry entry : request.getKpiRatings()) {
+            if (entry.getKpiId() == null) continue;
+            PmsKpi matchedKpi = kpis.stream()
+                    .filter(k -> k.getId().equals(entry.getKpiId()))
+                    .findFirst().orElse(null);
+            if (matchedKpi == null) continue;
+
+            EmployeeKpiRating rating = existingRatings.stream()
+                    .filter(r -> r.getKpi().getId().equals(entry.getKpiId()))
+                    .findFirst()
+                    .orElseGet(() -> EmployeeKpiRating.builder()
+                            .assignment(assignment)
+                            .kpi(matchedKpi)
+                            .build());
+
+            if (entry.getSelfRating() != null) {
+                rating.setSelfRating(entry.getSelfRating());
+            }
+            if (entry.getEmployeeComments() != null) {
+                rating.setComments(entry.getEmployeeComments());
+            }
+            if (entry.getManagerRating() != null) {
+                rating.setManagerRating(entry.getManagerRating());
+            }
+            if (entry.getManagerComments() != null) {
+                rating.setManagerComments(entry.getManagerComments());
+            }
+            if (entry.getHrRating() != null) {
+                rating.setHrRating(entry.getHrRating());
+            }
+            rating.setStatus("HR_EDITED");
+            employeeKpiRatingRepository.save(rating);
+        }
+
+        // Recalculate overall weighted score on PmsAssignment for employee, manager, and HR dashboards
+        List<EmployeeKpiRating> updatedRatings = employeeKpiRatingRepository.findByAssignment(assignment);
+        double weightedSum = 0.0;
+        double totalWeight = 0.0;
+
+        for (PmsKpi kpi : kpis) {
+            EmployeeKpiRating r = updatedRatings.stream()
+                    .filter(rt -> rt.getKpi().getId().equals(kpi.getId()))
+                    .findFirst().orElse(null);
+            Double score = null;
+            if (r != null) {
+                if (r.getHrRating() != null) score = r.getHrRating();
+                else if (r.getManagerRating() != null) score = r.getManagerRating();
+                else if (r.getSelfRating() != null) score = r.getSelfRating();
+            }
+            if (score != null) {
+                weightedSum += score * (kpi.getWeightage() / 100.0);
+                totalWeight += kpi.getWeightage();
+            }
+        }
+
+        if (totalWeight > 0) {
+            double calcScore = Math.round(weightedSum * 100.0) / 100.0;
+            assignment.setOverallScore(calcScore);
+
+            String grade;
+            if (calcScore >= 4.5) grade = "Outstanding Performance";
+            else if (calcScore >= 4.0) grade = "Excellent Performance";
+            else if (calcScore >= 3.5) grade = "Very Good Performance";
+            else if (calcScore >= 3.0) grade = "Good Performance";
+            else if (calcScore >= 2.0) grade = "Needs Improvement";
+            else grade = "Poor";
+
+            assignment.setPerformanceGrade(grade);
+            pmsAssignmentRepository.save(assignment);
+
+            // Synchronize with FinalPmsResult and PmsHistory if present
+            finalPmsResultRepository.findByAssignment(assignment).ifPresent(res -> {
+                res.setFinalScore(calcScore);
+                res.setGrade(grade);
+                finalPmsResultRepository.save(res);
+            });
+
+            pmsHistoryRepository.findFirstByAssignmentId(assignment.getId()).ifPresent(h -> {
+                h.setFinalScore(calcScore);
+                h.setGrade(grade);
+                pmsHistoryRepository.save(h);
+            });
+        }
+
+        return Map.of(
+                "message", "KPI ratings and comments updated successfully.",
+                "assignmentId", assignment.getId(),
+                "updatedCount", request.getKpiRatings().size()
         );
     }
 

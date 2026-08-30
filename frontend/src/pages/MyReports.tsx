@@ -13,6 +13,7 @@ export const MyReports: React.FC = () => {
   
   // Track downloading states per report
   const [downloading, setDownloading] = useState<Record<number, boolean>>({});
+  const [cycleFilter, setCycleFilter] = useState<'ALL' | 'LAST_3_MONTHS' | 'QUARTERLY'>('ALL');
 
   useEffect(() => {
     pmsApi.getHistory()
@@ -40,6 +41,21 @@ export const MyReports: React.FC = () => {
       setDownloading(prev => ({ ...prev, [assignmentId]: false }));
     }
   };
+
+  const filteredReports = reports.filter((r, idx) => {
+    if (cycleFilter === 'LAST_3_MONTHS') {
+      return idx < 3; // Top 3 recent months
+    }
+    if (cycleFilter === 'QUARTERLY') {
+      return r.cycleMonth.toLowerCase().includes('q') || idx < 3;
+    }
+    return true;
+  });
+
+  const last3Reports = reports.slice(0, 3);
+  const avg3MonthScore = last3Reports.length > 0
+    ? (last3Reports.reduce((sum, r) => sum + r.finalScore, 0) / last3Reports.length).toFixed(2)
+    : null;
 
   if (loading) {
     return (
@@ -69,14 +85,59 @@ export const MyReports: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      <div>
-        <h2 className="text-xl font-bold text-pms-gray">Appraisal Reports Repository</h2>
-        <p className="text-xs text-slate-500 mt-1">
-          Access finalized historical performance reports and download official PDF performance certifications.
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-pms-gray">Appraisal Reports Repository</h2>
+          <p className="text-xs text-slate-500 mt-1">
+            Access finalized historical performance reports, 3-month quarterly evaluations, and download PDF certifications.
+          </p>
+        </div>
+
+        {/* 3-Month Appraisal Cycle Filter */}
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200/80">
+          <button
+            onClick={() => setCycleFilter('ALL')}
+            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${cycleFilter === 'ALL' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+          >
+            All Reports ({reports.length})
+          </button>
+          <button
+            onClick={() => setCycleFilter('LAST_3_MONTHS')}
+            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${cycleFilter === 'LAST_3_MONTHS' ? 'bg-pms-green text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+          >
+            Last 3 Months Evaluation
+          </button>
+          <button
+            onClick={() => setCycleFilter('QUARTERLY')}
+            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${cycleFilter === 'QUARTERLY' ? 'bg-pms-green text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+          >
+            3-Month Quarterly View
+          </button>
+        </div>
       </div>
 
-      {reports.length === 0 ? (
+      {/* 3-Month Performance Summary Card */}
+      {avg3MonthScore && (
+        <div className="bg-gradient-to-r from-purple-900 via-slate-900 to-pms-darkGreen text-white p-6 rounded-2xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-200">
+              3-Month Appraisal Performance Summary
+            </span>
+            <h3 className="text-xl font-bold mt-1">3-Month Average Score: {avg3MonthScore} / 5.00</h3>
+            <p className="text-xs text-slate-300 mt-0.5">
+              Based on your latest 3 consecutive monthly PMS appraisal cycles.
+            </p>
+          </div>
+          <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl text-center border border-white/20">
+            <span className="text-[9px] font-bold uppercase text-slate-300 block">3-Month Grade</span>
+            <span className="text-lg font-black text-pms-green">
+              {Number(avg3MonthScore) >= 4.5 ? 'Outstanding' : Number(avg3MonthScore) >= 4.0 ? 'Excellent' : 'Very Good'}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {filteredReports.length === 0 ? (
         <div className="bg-white border border-slate-200/60 rounded-xl p-12 text-center shadow-sm">
           <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4 text-slate-400">
             <FileText size={24} />
@@ -88,7 +149,7 @@ export const MyReports: React.FC = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {reports.map((report) => (
+          {filteredReports.map((report) => (
             <div key={report.id} className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4">
               
               <div className="space-y-3">

@@ -44,13 +44,11 @@ public class User implements UserDetails {
     private String passwordHash;
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(nullable = false, columnDefinition = "user_role")
+    @Column(nullable = false)
     private UserRole role;
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(nullable = false, columnDefinition = "record_status")
+    @Column(nullable = false)
     private RecordStatus status = RecordStatus.ACTIVE;
 
     @Column(name = "failed_attempts", nullable = false)

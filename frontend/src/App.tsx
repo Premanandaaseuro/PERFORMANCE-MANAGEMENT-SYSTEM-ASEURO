@@ -233,6 +233,14 @@ export const App: React.FC = () => {
             }
           />
           <Route
+            path="/hr/lifecycle"
+            element={
+              <ProtectedRoute requiredRole="HR">
+                <HrPmsLifecyclePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/hr/reports"
             element={
               <ProtectedRoute requiredRole="HR">

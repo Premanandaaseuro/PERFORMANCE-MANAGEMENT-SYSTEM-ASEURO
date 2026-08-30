@@ -18,9 +18,13 @@ public class UpdateKpiMasterRequest {
     private String description;
 
     @NotNull(message = "Weightage is required")
-    @DecimalMin(value = "1.0", message = "Weightage must be at least 1%")
+    @DecimalMin(value = "0.01", message = "Weightage must be greater than 0%")
     @DecimalMax(value = "100.0", message = "Weightage cannot exceed 100%")
     private Double weightage;
+
+    private String selfRatingScale;
+
+    private String managerRatingScale;
 
     private String status;
 }

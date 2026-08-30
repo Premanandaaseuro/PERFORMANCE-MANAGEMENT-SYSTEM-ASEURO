@@ -259,10 +259,10 @@ public class DatabaseSeeder implements CommandLineRunner {
     }
 
     private void seedKpiMasterData() {
-        boolean hasNewKpis = kpiMasterRepository.findAll().stream()
+        boolean hasExact12 = kpiMasterRepository.findAll().stream()
                 .anyMatch(k -> "Sprint Task Completion".equalsIgnoreCase(k.getKpiName()));
 
-        if (hasNewKpis && kpiMasterRepository.count() > 0) {
+        if (hasExact12 && kpiMasterRepository.count() > 0) {
             return;
         }
 
@@ -277,18 +277,21 @@ public class DatabaseSeeder implements CommandLineRunner {
         );
 
         for (String des : designations) {
-            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Sprint Task Completion").description("Sprint Task Completion - tasks completed within sprint (individual)").weightage(10.0).build());
-            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Deadline Adherence").description("Deadline Adherence - tasks completed on or before deadline").weightage(15.0).build());
-            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Task Quality with Defects").description("Task Quality with Defects - tasks delivered without defects, including reopen and critical issues").weightage(10.0).build());
-            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Prompt Quality").description("Prompt Quality - AI tasks with minimal rework").weightage(15.0).build());
-            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Jira Time Logging").description("Jira Time Logging - days logged properly in Jira").weightage(10.0).build());
-            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Jira Discipline").description("Jira Discipline - status updates, comments, transitions, and ticket hygiene").weightage(5.0).build());
-            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Accountability & Ownership").description("Accountability & Ownership - proactive ownership, updates, issue handling, team collaboration, and engagement").weightage(10.0).build());
-            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Leave Pattern").description("Leave Pattern - planned leaves should be 95% of total leaves; unplanned leaves should not exceed 5% in a year including sick leave; sick leave every month for more than two days requires a medical certificate").weightage(5.0).build());
-            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Team Collaboration and Engagement").description("Team Collaboration and Engagement").weightage(5.0).build());
-            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Punctuality").description("Punctuality").weightage(5.0).build());
-            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("New Initiatives and Participation").description("New Initiatives and Participation").weightage(5.0).build());
-            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Rewards").description("Rewards").weightage(5.0).build());
+            // Technical / Custom KPIs (75% Total)
+            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Sprint Task Completion").description("Sprint Task Completion - tasks completed within sprint (individual)").weightage(10.0).selfRatingScale("1.0 - 5.0 Rating Scale").managerRatingScale("1.0 - 5.0 Rating Scale").status("ACTIVE").build());
+            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Deadline Adherence").description("Deadline Adherence - tasks completed on or before deadline").weightage(15.0).selfRatingScale("1.0 - 5.0 Rating Scale").managerRatingScale("1.0 - 5.0 Rating Scale").status("ACTIVE").build());
+            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Task Quality with Defects").description("Task Quality with Defects - tasks delivered without defects, including reopen and critical issues").weightage(10.0).selfRatingScale("1.0 - 5.0 Rating Scale").managerRatingScale("1.0 - 5.0 Rating Scale").status("ACTIVE").build());
+            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Prompt Quality").description("Prompt Quality - AI tasks with minimal rework").weightage(15.0).selfRatingScale("1.0 - 5.0 Rating Scale").managerRatingScale("1.0 - 5.0 Rating Scale").status("ACTIVE").build());
+            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Jira Time Logging").description("Jira Time Logging - days logged properly in Jira").weightage(10.0).selfRatingScale("1.0 - 5.0 Rating Scale").managerRatingScale("1.0 - 5.0 Rating Scale").status("ACTIVE").build());
+            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Jira Discipline").description("Jira Discipline - status updates, comments, transitions, and ticket hygiene").weightage(5.0).selfRatingScale("1.0 - 5.0 Rating Scale").managerRatingScale("1.0 - 5.0 Rating Scale").status("ACTIVE").build());
+            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Accountability & Ownership").description("Accountability & Ownership - proactive ownership, updates, issue handling, team collaboration, and engagement").weightage(10.0).selfRatingScale("1.0 - 5.0 Rating Scale").managerRatingScale("1.0 - 5.0 Rating Scale").status("ACTIVE").build());
+
+            // Standardized HR Rating / Organizational Hygiene KPIs (25% Total)
+            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Leave Pattern").description("Leave Pattern - planned leaves should be 95% of total leaves; unplanned leaves should not exceed 5% in a year including sick leave; sick leave every month for more than two days requires a medical certificate").weightage(5.0).selfRatingScale("1.0 - 5.0 Rating Scale").managerRatingScale("1.0 - 5.0 Rating Scale").status("ACTIVE").build());
+            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Team Collaboration and Engagement").description("Team Collaboration and Engagement").weightage(5.0).selfRatingScale("1.0 - 5.0 Rating Scale").managerRatingScale("1.0 - 5.0 Rating Scale").status("ACTIVE").build());
+            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Punctuality").description("Punctuality").weightage(5.0).selfRatingScale("1.0 - 5.0 Rating Scale").managerRatingScale("1.0 - 5.0 Rating Scale").status("ACTIVE").build());
+            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("New Initiatives and Participation").description("New Initiatives and Participation").weightage(5.0).selfRatingScale("1.0 - 5.0 Rating Scale").managerRatingScale("1.0 - 5.0 Rating Scale").status("ACTIVE").build());
+            kpiMasterRepository.save(KpiMaster.builder().designation(des).kpiName("Rewards").description("Rewards").weightage(5.0).selfRatingScale("1.0 - 5.0 Rating Scale").managerRatingScale("1.0 - 5.0 Rating Scale").status("ACTIVE").build());
         }
     }
 }
