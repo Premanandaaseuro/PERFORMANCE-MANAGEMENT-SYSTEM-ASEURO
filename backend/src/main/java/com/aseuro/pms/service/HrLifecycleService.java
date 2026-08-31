@@ -150,6 +150,7 @@ public class HrLifecycleService {
             km.put("comments", r != null ? r.getComments() : null);
             km.put("employeeComments", r != null ? r.getComments() : null);
             km.put("managerComments", r != null ? r.getManagerComments() : null);
+            km.put("hrComments", r != null ? r.getHrComments() : null);
             km.put("ratingStatus", r != null ? r.getStatus() : "PENDING");
 
             // Final score contribution
@@ -354,6 +355,9 @@ public class HrLifecycleService {
             }
             if (entry.getHrRating() != null) {
                 rating.setHrRating(entry.getHrRating());
+            }
+            if (entry.getHrComments() != null) {
+                rating.setHrComments(entry.getHrComments());
             }
             rating.setStatus("HR_EDITED");
             employeeKpiRatingRepository.save(rating);

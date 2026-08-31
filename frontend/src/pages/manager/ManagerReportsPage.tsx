@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { pmsApi } from '../../api/pmsApi';
 import { managerApi } from '../../api/managerApi';
 import { reportApi } from '../../api/reportApi';
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react';
 
 export const ManagerReportsPage: React.FC = () => {
+  const navigate = useNavigate();
   const [reportTab, setReportTab] = useState<'TEAM' | 'MY_RATINGS'>('TEAM');
   const [reportsData, setReportsData] = useState<ManagerReportData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -34,6 +36,7 @@ export const ManagerReportsPage: React.FC = () => {
   // Manager's own personal appraisal history state
   const [myHistoryList, setMyHistoryList] = useState<PmsHistory[]>([]);
   const [myCurrentAssignment, setMyCurrentAssignment] = useState<PmsAssignment | null>(null);
+  const [myCycleFilter, setMyCycleFilter] = useState<'ALL' | 'LAST_3_MONTHS' | 'QUARTERLY'>('ALL');
 
   useEffect(() => {
     fetchReports();
@@ -107,6 +110,17 @@ export const ManagerReportsPage: React.FC = () => {
   });
 
   const uniqueMonths: string[] = Array.from(new Set((reportsData?.assignedEmployees || []).map((e: ManagerEmployeeItem) => e.cycleMonth || 'August 2026')));
+
+  const filteredMyHistory = myHistoryList.filter((h, idx) => {
+    if (myCycleFilter === 'LAST_3_MONTHS') return idx < 3;
+    if (myCycleFilter === 'QUARTERLY') return h.cycleMonth.toLowerCase().includes('q') || idx < 3;
+    return true;
+  });
+
+  const last3MyReports = myHistoryList.slice(0, 3);
+  const avg3MonthScore = last3MyReports.length > 0
+    ? (last3MyReports.reduce((sum, r) => sum + r.finalScore, 0) / last3MyReports.length).toFixed(2)
+    : null;
 
   if (loading) {
     return (
@@ -289,35 +303,121 @@ export const ManagerReportsPage: React.FC = () => {
 
           {/* Historical Cycles List */}
           {myHistoryList.length > 0 && (
-            <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
-              <h3 className="text-sm font-bold text-slate-800 flex items-center space-x-2">
-                <Clock size={16} className="text-slate-400" />
-                <span>Previous Months Appraisal Reports</span>
-              </h3>
+            <div className="space-y-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800 flex items-center space-x-2">
+                    <Clock size={16} className="text-slate-400" />
+                    <span>Appraisal Reports Repository</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Access your finalized historical performance reports, 3-month quarterly evaluations, and download PDF certifications.
+                  </p>
+                </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {myHistoryList.map((h: PmsHistory) => (
-                  <div key={h.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 flex flex-col justify-between space-y-3">
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-bold text-sm text-slate-900">{h.cycleMonth} Appraisal</h4>
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-800">
+                {/* 3-Month Appraisal Cycle Filter Buttons */}
+                <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200/80">
+                  <button
+                    onClick={() => setMyCycleFilter('ALL')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                      myCycleFilter === 'ALL'
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    All Reports ({myHistoryList.length})
+                  </button>
+                  <button
+                    onClick={() => setMyCycleFilter('LAST_3_MONTHS')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                      myCycleFilter === 'LAST_3_MONTHS'
+                        ? 'bg-pms-green text-white shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    Last 3 Months Evaluation
+                  </button>
+                  <button
+                    onClick={() => setMyCycleFilter('QUARTERLY')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                      myCycleFilter === 'QUARTERLY'
+                        ? 'bg-pms-green text-white shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    3-Month Quarterly View
+                  </button>
+                </div>
+              </div>
+
+              {/* 3-Month Performance Summary Banner */}
+              {avg3MonthScore && (
+                <div className="bg-gradient-to-r from-purple-900 via-slate-900 to-pms-darkGreen text-white p-6 rounded-2xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-200">
+                      3-Month Appraisal Performance Summary
+                    </span>
+                    <h3 className="text-xl font-bold mt-1">3-Month Average Score: {avg3MonthScore} / 5.00</h3>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      Based on your latest 3 consecutive monthly PMS appraisal cycles.
+                    </p>
+                  </div>
+                  <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl text-center border border-white/20">
+                    <span className="text-[9px] font-bold uppercase text-slate-300 block">3-Month Grade</span>
+                    <span className="text-lg font-black text-pms-green">
+                      {Number(avg3MonthScore) >= 4.5 ? 'Outstanding' : Number(avg3MonthScore) >= 4.0 ? 'Excellent' : 'Very Good'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Monthly Appraisal Cards Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {filteredMyHistory.map((h: PmsHistory) => (
+                  <div
+                    key={h.id}
+                    className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 rounded-lg bg-pms-lightGreen flex items-center justify-center text-pms-darkGreen shrink-0 font-semibold shadow-inner">
+                          <FileText size={22} />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-base text-pms-gray">{h.cycleMonth} Appraisal</h4>
+                          <p className="text-xs text-slate-400 mt-0.5">Finalized on {h.finalizedDate}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        <span className="text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200/80 px-2.5 py-1 rounded">
+                          Score: {h.finalScore.toFixed(2)} / 5.00
+                        </span>
+                        <span className="text-[11px] font-bold text-pms-darkGreen bg-pms-lightGreen/60 border border-pms-green/20 px-3 py-1 rounded-full uppercase tracking-wider">
                           {h.grade}
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-400 mt-1">Finalized on {h.finalizedDate}</p>
-                      <div className="text-xl font-black text-purple-950 mt-2">
-                        {h.finalScore.toFixed(2)} <span className="text-xs text-slate-400 font-normal">/ 5.0</span>
-                      </div>
                     </div>
 
-                    <div className="pt-3 border-t border-slate-200/60 flex items-center justify-end space-x-2">
+                    {/* Action Buttons: View & Download PDF */}
+                    <div className="pt-3 border-t border-slate-100 flex items-center justify-end space-x-3">
+                      <button
+                        onClick={() => navigate(`/history/${h.assignmentId || h.id}`)}
+                        className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 hover:text-pms-gray rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1.5 shadow-sm"
+                        title="View online report details"
+                      >
+                        <Eye size={15} />
+                        <span>View</span>
+                      </button>
+
                       <button
                         onClick={() => handleDownload(h.assignmentId || h.id, 'pdf', 'My_Report')}
-                        className="px-3 py-1.5 bg-pms-green text-white text-xs font-bold rounded-lg hover:bg-pms-darkGreen transition-colors flex items-center space-x-1"
+                        disabled={downloading === (h.assignmentId || h.id)}
+                        className="px-4 py-2 bg-pms-green hover:bg-pms-darkGreen text-white rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1.5 shadow disabled:opacity-50"
+                        title="Download PDF report"
                       >
-                        <Download size={13} />
-                        <span>Download PDF</span>
+                        <Download size={15} className={downloading === (h.assignmentId || h.id) ? 'animate-bounce' : ''} />
+                        <span>{downloading === (h.assignmentId || h.id) ? 'Downloading...' : 'Download PDF'}</span>
                       </button>
                     </div>
                   </div>

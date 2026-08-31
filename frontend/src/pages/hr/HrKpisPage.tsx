@@ -43,6 +43,7 @@ export const HrKpisPage: React.FC = () => {
   const [formWeightage, setFormWeightage] = useState<number>(25);
   const [formSelfRatingScale, setFormSelfRatingScale] = useState('1.0 - 5.0 Rating Scale');
   const [formManagerRatingScale, setFormManagerRatingScale] = useState('1.0 - 5.0 Rating Scale');
+  const [formKpiCategory, setFormKpiCategory] = useState<'REGULAR' | 'HR'>('REGULAR');
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -131,6 +132,7 @@ export const HrKpisPage: React.FC = () => {
     setFormWeightage(25);
     setFormSelfRatingScale('1.0 - 5.0 Rating Scale');
     setFormManagerRatingScale('1.0 - 5.0 Rating Scale');
+    setFormKpiCategory('REGULAR');
     setFormError(null);
     setModalOpen(true);
   };
@@ -143,6 +145,7 @@ export const HrKpisPage: React.FC = () => {
     setFormWeightage(kpi.weightage);
     setFormSelfRatingScale(kpi.selfRatingScale || '1.0 - 5.0 Rating Scale');
     setFormManagerRatingScale(kpi.managerRatingScale || '1.0 - 5.0 Rating Scale');
+    setFormKpiCategory(isHrRatingKpiName(kpi.kpiName) ? 'HR' : 'REGULAR');
     setFormError(null);
     setModalOpen(true);
   };
@@ -162,13 +165,27 @@ export const HrKpisPage: React.FC = () => {
       return;
     }
 
-    // Validate 75% non-HR weightage limit and 100% total limit
-    const isHrParam = isHrRatingKpiName(formKpiName);
+    let finalKpiName = formKpiName.trim();
+    if (formKpiCategory === 'HR' && !isHrRatingKpiName(finalKpiName)) {
+      finalKpiName = `${finalKpiName} (HR Assessment)`;
+    }
+
+    // Validate 75% non-HR weightage limit and 25% HR weightage limit
+    const isHrParam = formKpiCategory === 'HR' || isHrRatingKpiName(finalKpiName);
+
     const nonHrKpis = kpis.filter(k => !isHrRatingKpiName(k.kpiName) && (modalMode === 'create' || k.id !== currentKpiId));
     const otherNonHrWeight = nonHrKpis.reduce((sum, k) => sum + k.weightage, 0);
 
+    const hrKpis = kpis.filter(k => isHrRatingKpiName(k.kpiName) && (modalMode === 'create' || k.id !== currentKpiId));
+    const otherHrWeight = hrKpis.reduce((sum, k) => sum + k.weightage, 0);
+
     if (!isHrParam && (otherNonHrWeight + formWeightage > 75.0)) {
-      setFormError(`Total Non-HR KPI weightage cannot exceed 75%! (Currently allocated non-HR: ${otherNonHrWeight.toFixed(1)}%, Maximum remaining available for Non-HR KPIs: ${(75.0 - otherNonHrWeight).toFixed(1)}%). 25% is reserved for HR Parameters.`);
+      setFormError(`Total Non-HR KPI weightage cannot exceed 75%! (Currently allocated non-HR: ${otherNonHrWeight.toFixed(1)}%, Maximum remaining available for Non-HR KPIs: ${(75.0 - otherNonHrWeight).toFixed(1)}%). Switch KPI Category to "HR Parameter KPI" if adding an HR KPI.`);
+      return;
+    }
+
+    if (isHrParam && (otherHrWeight + formWeightage > 25.0)) {
+      setFormError(`Total HR Parameter weightage cannot exceed 25%! (Currently allocated HR Parameters: ${otherHrWeight.toFixed(1)}%, Maximum remaining available for HR Parameters: ${(25.0 - otherHrWeight).toFixed(1)}%).`);
       return;
     }
 
@@ -186,22 +203,22 @@ export const HrKpisPage: React.FC = () => {
       if (modalMode === 'create') {
         await hrApi.createKpi({
           designation: selectedDesignation,
-          kpiName: formKpiName.trim(),
+          kpiName: finalKpiName,
           description: formDescription.trim(),
           weightage: formWeightage,
           selfRatingScale: formSelfRatingScale.trim(),
           managerRatingScale: formManagerRatingScale.trim()
         });
-        setSuccess(`KPI "${formKpiName}" created successfully.`);
+        setSuccess(`KPI "${finalKpiName}" created successfully.`);
       } else if (currentKpiId) {
         await hrApi.updateKpi(currentKpiId, {
-          kpiName: formKpiName.trim(),
+          kpiName: finalKpiName,
           description: formDescription.trim(),
           weightage: formWeightage,
           selfRatingScale: formSelfRatingScale.trim(),
           managerRatingScale: formManagerRatingScale.trim()
         });
-        setSuccess(`KPI "${formKpiName}" updated successfully.`);
+        setSuccess(`KPI "${finalKpiName}" updated successfully.`);
       }
 
       setModalOpen(false);
@@ -476,6 +493,56 @@ export const HrKpisPage: React.FC = () => {
             )}
 
             <form onSubmit={handleSaveKpi} className="space-y-4">
+              {/* Field 0: KPI Category / Evaluator Type */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                  KPI Category / Evaluator Type *
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label
+                    className={`p-3 rounded-xl border flex items-center space-x-2.5 cursor-pointer transition-all ${
+                      formKpiCategory === 'REGULAR'
+                        ? 'bg-emerald-50/80 border-emerald-500 ring-2 ring-emerald-500/20 text-emerald-950 font-bold'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 font-medium'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="kpiCategory"
+                      value="REGULAR"
+                      checked={formKpiCategory === 'REGULAR'}
+                      onChange={() => setFormKpiCategory('REGULAR')}
+                      className="accent-emerald-600"
+                    />
+                    <div className="text-xs">
+                      <span className="block font-bold">Technical / Regular KPI</span>
+                      <span className="text-[10px] text-slate-500 font-normal">Manager Evaluated (Max 75% Total)</span>
+                    </div>
+                  </label>
+
+                  <label
+                    className={`p-3 rounded-xl border flex items-center space-x-2.5 cursor-pointer transition-all ${
+                      formKpiCategory === 'HR'
+                        ? 'bg-purple-50/90 border-purple-500 ring-2 ring-purple-500/20 text-purple-950 font-bold'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 font-medium'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="kpiCategory"
+                      value="HR"
+                      checked={formKpiCategory === 'HR'}
+                      onChange={() => setFormKpiCategory('HR')}
+                      className="accent-purple-600"
+                    />
+                    <div className="text-xs">
+                      <span className="block font-bold text-purple-900">HR Parameter KPI</span>
+                      <span className="text-[10px] text-purple-700 font-normal">HR Evaluated (25% Reserved)</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
               {/* Field 1: KPI Name */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
@@ -486,7 +553,7 @@ export const HrKpisPage: React.FC = () => {
                   required
                   value={formKpiName}
                   onChange={(e) => setFormKpiName(e.target.value)}
-                  placeholder="e.g. Sprint Feature Delivery & Quality"
+                  placeholder={formKpiCategory === 'HR' ? "e.g. Leave Pattern, Discipline & Team Conduct" : "e.g. Sprint Feature Delivery & Code Quality"}
                   className="block w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
                 />
               </div>

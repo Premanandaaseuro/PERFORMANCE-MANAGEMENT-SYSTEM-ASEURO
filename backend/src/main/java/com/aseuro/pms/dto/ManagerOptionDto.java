@@ -5,5 +5,7 @@ public record ManagerOptionDto(
         String fullName,
         String employeeCode,
         String email,
-        String designationName
+        String designationName,
+        Long managerId,
+        String managerName
 ) {}

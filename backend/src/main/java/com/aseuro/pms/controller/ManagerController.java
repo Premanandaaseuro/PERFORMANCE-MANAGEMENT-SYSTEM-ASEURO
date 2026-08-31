@@ -84,10 +84,14 @@ public class ManagerController {
         PmsAssignment assignment = pmsAssignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Assignment not found"));
 
-        // Validate that this assignment belongs to an employee reporting to this manager
-        if (assignment.getEmployee().getManager() == null ||
-            !assignment.getEmployee().getManager().getId().equals(principal.getId())) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "Unauthorized: Employee does not report to you.");
+        boolean isSelf = assignment.getEmployee().getId().equals(principal.getId());
+        boolean isDirectReport = assignment.getEmployee().getManager() != null &&
+                assignment.getEmployee().getManager().getId().equals(principal.getId());
+        boolean isManagerOrHr = principal.getAuthorities() != null && principal.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().contains("MANAGER") || a.getAuthority().contains("HR"));
+
+        if (!isSelf && !isDirectReport && !isManagerOrHr) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Unauthorized: You do not have permission to download this report.");
         }
 
         byte[] data;

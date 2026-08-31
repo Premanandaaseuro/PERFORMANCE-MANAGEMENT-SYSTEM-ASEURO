@@ -258,6 +258,8 @@ public class ManagerService {
             item.put("employeeComments", r != null ? r.getComments() : null);
             item.put("managerRating", r != null ? r.getManagerRating() : null);
             item.put("managerComments", r != null ? r.getManagerComments() : null);
+            item.put("hrRating", r != null ? r.getHrRating() : null);
+            item.put("hrComments", r != null ? r.getHrComments() : null);
 
             if (r != null && r.getSelfRating() != null) {
                 selfWeightedSum += r.getSelfRating() * (kpi.getWeightage() / 100.0);

@@ -324,8 +324,13 @@ export const HistoryDetail: React.FC = () => {
                         </p>
                       )}
                       {kpi.managerComments && (
-                        <p className="text-[11px] text-purple-950 bg-purple-50 p-2 border border-purple-200/60 rounded italic">
-                          <strong>Manager & HR Remarks:</strong> {kpi.managerComments}
+                        <p className="text-[11px] text-slate-700 bg-emerald-50/70 p-2 border border-emerald-200/60 rounded italic">
+                          <strong>Manager Remarks:</strong> {kpi.managerComments}
+                        </p>
+                      )}
+                      {kpi.hrComments && (
+                        <p className="text-[11px] text-purple-950 bg-purple-50 p-2 border border-purple-200/80 rounded italic font-medium">
+                          <strong>HR Remarks:</strong> {kpi.hrComments}
                         </p>
                       )}
                     </td>
@@ -351,36 +356,6 @@ export const HistoryDetail: React.FC = () => {
           </table>
         </div>
       </div>
-
-      {/* Review Remarks list */}
-      {assignment.reviews.length > 0 && (
-        <div className="bg-white border border-slate-200/60 rounded-xl p-6 shadow-sm space-y-4">
-          <h3 className="text-sm font-bold text-pms-gray pb-2 border-b border-slate-100">
-            Reviews & Evaluators remarks
-          </h3>
-          <div className="space-y-4">
-            {assignment.reviews.map((rev, idx) => (
-              <div key={idx} className="p-4 bg-slate-50 border border-slate-200/40 rounded-lg flex items-start space-x-3.5">
-                <div className="w-8 h-8 rounded-full bg-pms-green/20 text-pms-darkGreen font-bold flex items-center justify-center uppercase shrink-0">
-                  {rev.reviewerName.charAt(0)}
-                </div>
-                <div>
-                  <div className="flex items-baseline space-x-2">
-                    <span className="font-bold text-xs text-pms-gray">{rev.reviewerName}</span>
-                    <span className="text-[10px] text-slate-400 bg-slate-200/60 px-2 py-0.5 rounded font-semibold uppercase tracking-wider">
-                      {rev.reviewerRole}
-                    </span>
-                    <span className="text-[10px] text-slate-400">{rev.reviewDate}</span>
-                  </div>
-                  <p className="text-xs text-slate-650 mt-1.5 leading-relaxed italic">
-                    "{rev.comments}"
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
     </div>
   );

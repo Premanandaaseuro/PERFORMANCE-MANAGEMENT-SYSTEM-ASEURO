@@ -23,5 +23,6 @@ public class HrUpdateKpiRatingsRequest {
         private Double managerRating;    // HR editing Manager Rating (25% HR KPIs or HR override)
         private String managerComments;  // HR editing Manager Comments
         private Double hrRating;         // HR Rating
+        private String hrComments;       // HR Feedback / Remarks for this KPI
     }
 }

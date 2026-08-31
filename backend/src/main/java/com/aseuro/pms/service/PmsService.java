@@ -347,6 +347,8 @@ public class PmsService {
                     .managerRating(r != null ? r.getManagerRating() : null)
                     .hrRating(effectiveHrRating)
                     .comments(r != null ? r.getComments() : null)
+                    .managerComments(r != null ? r.getManagerComments() : null)
+                    .hrComments(r != null ? r.getHrComments() : null)
                     .ratingStatus(r != null ? r.getStatus() : "PENDING")
                     .build();
         }).collect(Collectors.toList());

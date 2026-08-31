@@ -27,5 +27,6 @@ public class CreateManagerRequest {
     private String department;
     private String team;
     private String designation;
+    private Long managerId;
     private LocalDate joiningDate;
 }

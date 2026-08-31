@@ -107,8 +107,11 @@ export const ManagerKpiReviewPage: React.FC = () => {
   const handleSubmitReview = async () => {
     if (!reviewData) return;
 
-    // Validation: All manager ratings must be between 0.0 and 5.0
+    // Validation: All manager ratings for non-HR KPIs must be between 0.0 and 5.0
     for (const k of reviewData.kpis) {
+      if (isHrStandardKpiName(k.kpiName)) {
+        continue; // HR parameters are evaluated by HR, skip manager rating requirement
+      }
       const entry = managerRatings[k.kpiId];
       if (typeof entry?.rating !== 'number') {
         setError(`Please provide a manager rating for "${k.kpiName}".`);
@@ -129,11 +132,13 @@ export const ManagerKpiReviewPage: React.FC = () => {
       setError(null);
 
       const payload = {
-        ratings: Object.entries(managerRatings).map(([kpiId, val]) => ({
-          kpiId: parseInt(kpiId),
-          managerRating: val.rating as number,
-          managerComments: val.comments
-        })),
+        ratings: reviewData.kpis
+          .filter(k => typeof managerRatings[k.kpiId]?.rating === 'number')
+          .map(k => ({
+            kpiId: k.kpiId,
+            managerRating: managerRatings[k.kpiId].rating as number,
+            managerComments: managerRatings[k.kpiId].comments
+          })),
         managerComments: generalComments
       };
 
@@ -360,7 +365,7 @@ export const ManagerKpiReviewPage: React.FC = () => {
               </div>
 
               {/* Comments Section */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {/* Employee Evidence */}
                 <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-100 space-y-1">
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
@@ -388,6 +393,16 @@ export const ManagerKpiReviewPage: React.FC = () => {
                         : 'bg-white text-slate-800 border-slate-200 focus:ring-2 focus:ring-pms-green'
                     }`}
                   />
+                </div>
+
+                {/* HR Feedback & Remarks */}
+                <div className="bg-purple-50/70 p-4 rounded-2xl border border-purple-200/80 space-y-1">
+                  <span className="text-xs font-bold text-purple-900 uppercase tracking-wider block">
+                    HR Feedback & Remarks
+                  </span>
+                  <p className="text-sm text-purple-950 leading-relaxed font-medium">
+                    {kpi.hrComments || 'No HR feedback entered yet.'}
+                  </p>
                 </div>
               </div>
             </div>

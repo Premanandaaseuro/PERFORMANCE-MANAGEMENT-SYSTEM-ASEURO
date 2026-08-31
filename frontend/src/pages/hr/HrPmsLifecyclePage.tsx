@@ -46,6 +46,7 @@ export const HrPmsLifecyclePage: React.FC = () => {
   const [selfRatings, setSelfRatings] = useState<Record<number, number>>({});
   const [employeeCommentsMap, setEmployeeCommentsMap] = useState<Record<number, string>>({});
   const [managerCommentsMap, setManagerCommentsMap] = useState<Record<number, string>>({});
+  const [hrCommentsMap, setHrCommentsMap] = useState<Record<number, string>>({});
   const [savingRatings, setSavingRatings] = useState<boolean>(false);
 
   const isHrStandardKpiName = (name: string): boolean => {
@@ -111,12 +112,15 @@ export const HrPmsLifecyclePage: React.FC = () => {
         const initialEmpComments: Record<number, string> = {};
         const initialMgrComments: Record<number, string> = {};
 
+        const initialHrComments: Record<number, string> = {};
+
         data.kpis.forEach((kpi) => {
           initialHrRatings[kpi.kpiId] = kpi.hrRating ?? kpi.managerRating ?? kpi.selfRating ?? 5.0;
           initialMgrRatings[kpi.kpiId] = kpi.managerRating ?? kpi.selfRating ?? 5.0;
           initialSelfRatings[kpi.kpiId] = kpi.selfRating ?? 5.0;
           initialEmpComments[kpi.kpiId] = kpi.employeeComments || kpi.comments || '';
           initialMgrComments[kpi.kpiId] = kpi.managerComments || '';
+          initialHrComments[kpi.kpiId] = kpi.hrComments || '';
         });
 
         setHrRatings(initialHrRatings);
@@ -124,6 +128,7 @@ export const HrPmsLifecyclePage: React.FC = () => {
         setSelfRatings(initialSelfRatings);
         setEmployeeCommentsMap(initialEmpComments);
         setManagerCommentsMap(initialMgrComments);
+        setHrCommentsMap(initialHrComments);
 
         recalculateHrScore(data.kpis, initialHrRatings);
         setLoading(false);
@@ -147,7 +152,8 @@ export const HrPmsLifecyclePage: React.FC = () => {
           employeeComments: employeeCommentsMap[kpi.kpiId] !== undefined ? employeeCommentsMap[kpi.kpiId] : (kpi.employeeComments || kpi.comments || ''),
           managerRating: managerRatings[kpi.kpiId] !== undefined ? managerRatings[kpi.kpiId] : kpi.managerRating,
           managerComments: managerCommentsMap[kpi.kpiId] !== undefined ? managerCommentsMap[kpi.kpiId] : (kpi.managerComments || ''),
-          hrRating: hrRatings[kpi.kpiId] !== undefined ? hrRatings[kpi.kpiId] : kpi.hrRating
+          hrRating: hrRatings[kpi.kpiId] !== undefined ? hrRatings[kpi.kpiId] : kpi.hrRating,
+          hrComments: hrCommentsMap[kpi.kpiId] !== undefined ? hrCommentsMap[kpi.kpiId] : (kpi.hrComments || ''),
         }))
       };
       await hrApi.updateLifecycleRatings(lifecycleData.assignmentId, payload);
@@ -650,12 +656,12 @@ export const HrPmsLifecyclePage: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* Comments Section (Both Employee and Manager Comments Editable by HR) */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-200/60">
+                        {/* Comments Section (Employee, Manager & HR Comments Editable by HR) */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-200/60">
                           {/* Employee Comments */}
                           <div className="space-y-1">
                             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
-                              <span>Employee Self Comments / Evidence</span>
+                              <span>Employee Self Comments</span>
                               <span className="text-[9px] text-slate-400 font-normal">(HR Editable)</span>
                             </label>
                             <textarea
@@ -679,6 +685,21 @@ export const HrPmsLifecyclePage: React.FC = () => {
                               placeholder="Manager feedback comments..."
                               rows={2}
                               className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-pms-green/40 focus:border-pms-green"
+                            />
+                          </div>
+
+                          {/* HR Feedback & Comments */}
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-purple-900 uppercase tracking-wider flex items-center justify-between">
+                              <span>HR Feedback & Comments</span>
+                              <span className="text-[9px] text-purple-600 font-bold">(HR Editable)</span>
+                            </label>
+                            <textarea
+                              value={hrCommentsMap[kpi.kpiId] ?? ''}
+                              onChange={(e) => setHrCommentsMap(prev => ({ ...prev, [kpi.kpiId]: e.target.value }))}
+                              placeholder="HR evaluation comments & remarks..."
+                              rows={2}
+                              className="w-full p-2.5 bg-purple-50/50 border border-purple-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-purple-400 focus:border-purple-400 font-medium"
                             />
                           </div>
                         </div>

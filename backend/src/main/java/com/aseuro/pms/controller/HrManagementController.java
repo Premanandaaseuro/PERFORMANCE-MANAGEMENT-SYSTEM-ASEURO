@@ -121,7 +121,9 @@ public class HrManagementController {
                         m.getName(),
                         "MGR-" + m.getId(),
                         m.getEmail(),
-                        m.getDesignation() != null ? m.getDesignation() : "Engineering Manager"
+                        m.getDesignation() != null ? m.getDesignation() : "Engineering Manager",
+                        m.getManager() != null ? m.getManager().getId() : null,
+                        m.getManager() != null ? m.getManager().getName() : null
                 ))
                 .collect(Collectors.toList());
         return ResponseEntity.ok(list);
@@ -136,6 +138,11 @@ public class HrManagementController {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Email already exists in the system.");
         }
 
+        Employee reportingManager = null;
+        if (request.getManagerId() != null) {
+            reportingManager = employeeRepository.findById(request.getManagerId()).orElse(null);
+        }
+
         Employee manager = Employee.builder()
                 .name(request.getName().trim())
                 .email(email)
@@ -143,6 +150,7 @@ public class HrManagementController {
                 .department(request.getDepartment() != null ? request.getDepartment().trim() : "Engineering")
                 .team(request.getTeam() != null ? request.getTeam().trim() : "Core Team")
                 .designation(request.getDesignation() != null ? request.getDesignation().trim() : "Engineering Manager")
+                .manager(reportingManager)
                 .joiningDate(request.getJoiningDate() != null ? request.getJoiningDate() : LocalDate.now())
                 .accountStatus("ACTIVE")
                 .role(Role.ROLE_MANAGER)

@@ -164,9 +164,10 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("message", "Email address is required."));
         }
-        if (request.newPassword() == null || request.newPassword().trim().isEmpty()) {
+        String newPwd = request.newPassword();
+        if (newPwd == null || newPwd.length() < 8 || !newPwd.matches(".*[a-zA-Z].*") || !newPwd.matches(".*\\d.*") || !newPwd.matches(".*[^a-zA-Z0-9].*")) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("message", "Password should meet the criteria: alphabets, numbers, and special characters."));
+                    .body(Map.of("message", "Password should contain minimum 8 characters with alphabets, numbers, and special characters."));
         }
 
         Optional<Employee> empOpt = employeeRepository.findByEmail(request.email().trim());

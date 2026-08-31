@@ -117,13 +117,14 @@ export const Login: React.FC = () => {
       return;
     }
 
-    // Password criteria check: alphabets, numbers, and special characters
+    // Password criteria check: minimum 8 characters, alphabets, numbers, and special characters
+    const isMinLength = newPassword.length >= 8;
     const hasAlphabet = /[a-zA-Z]/.test(newPassword);
     const hasNumber = /[0-9]/.test(newPassword);
     const hasSpecialChar = /[^a-zA-Z0-9]/.test(newPassword);
 
-    if (!hasAlphabet || !hasNumber || !hasSpecialChar) {
-      const msg = 'Password should meet the criteria: alphabets, numbers, and special characters.';
+    if (!isMinLength || !hasAlphabet || !hasNumber || !hasSpecialChar) {
+      const msg = 'Password should contain minimum 8 characters with alphabets, numbers, and special characters.';
       setResetError(msg);
       alert(msg);
       return;
@@ -552,6 +553,7 @@ export const Login: React.FC = () => {
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-600 space-y-1 font-medium">
                 <p className="font-bold text-slate-700">Password Criteria Required:</p>
                 <ul className="list-disc list-inside space-y-0.5 text-slate-500">
+                  <li className={newPassword.length >= 8 ? 'text-emerald-600 font-bold' : ''}>Minimum 8 characters</li>
                   <li className={/[a-zA-Z]/.test(newPassword) ? 'text-emerald-600 font-bold' : ''}>Alphabets (a-z, A-Z)</li>
                   <li className={/[0-9]/.test(newPassword) ? 'text-emerald-600 font-bold' : ''}>Numbers (0-9)</li>
                   <li className={/[^a-zA-Z0-9]/.test(newPassword) ? 'text-emerald-600 font-bold' : ''}>Special Characters (!@#$%^&*...)</li>

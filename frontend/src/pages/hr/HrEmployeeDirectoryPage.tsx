@@ -381,11 +381,13 @@ export const HrEmployeeDirectoryPage: React.FC = () => {
                   className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-bold text-pms-gray focus:ring-2 focus:ring-pms-green/50"
                 >
                   <option value="">-- No Manager (Independent) --</option>
-                  {managers.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.fullName} ({m.employeeCode}) - {m.designationName}
-                    </option>
-                  ))}
+                  {managers
+                    .filter((m) => m.id !== editingEmp.id)
+                    .map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.fullName} ({m.employeeCode}) - {m.designationName}
+                      </option>
+                    ))}
                 </select>
               </div>
 
