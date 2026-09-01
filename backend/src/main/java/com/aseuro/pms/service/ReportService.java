@@ -59,10 +59,14 @@ public class ReportService {
         PmsAssignment assignment = pmsAssignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new IllegalArgumentException("Assignment not found"));
 
-        Employee reqUser = employeeRepository.findById(employeeId).orElse(null);
-        boolean isHrOrManager = reqUser != null && (reqUser.getRole() == Role.ROLE_HR || reqUser.getRole() == Role.ROLE_MANAGER);
+        Employee reqUser = employeeRepository.findById(employeeId)
+                .orElseGet(() -> employeeRepository.findByUserId(employeeId).orElse(null));
 
-        if (!assignment.getEmployee().getId().equals(employeeId) && !isHrOrManager) {
+        boolean isHrOrManager = reqUser != null && (reqUser.getRole() == Role.ROLE_HR || reqUser.getRole() == Role.ROLE_MANAGER);
+        boolean isSelf = (reqUser != null && assignment.getEmployee().getId().equals(reqUser.getId())) || assignment.getEmployee().getId().equals(employeeId);
+        boolean isDirectReport = reqUser != null && assignment.getEmployee().getManager() != null && assignment.getEmployee().getManager().getId().equals(reqUser.getId());
+
+        if (!isSelf && !isDirectReport && !isHrOrManager) {
             throw new AccessDeniedException("Unauthorized access to report");
         }
 
@@ -450,10 +454,14 @@ public class ReportService {
         PmsAssignment assignment = pmsAssignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new IllegalArgumentException("Assignment not found"));
 
-        Employee reqUser = employeeRepository.findById(employeeId).orElse(null);
-        boolean isHrOrManager = reqUser != null && (reqUser.getRole() == Role.ROLE_HR || reqUser.getRole() == Role.ROLE_MANAGER);
+        Employee reqUser = employeeRepository.findById(employeeId)
+                .orElseGet(() -> employeeRepository.findByUserId(employeeId).orElse(null));
 
-        if (!assignment.getEmployee().getId().equals(employeeId) && !isHrOrManager) {
+        boolean isHrOrManager = reqUser != null && (reqUser.getRole() == Role.ROLE_HR || reqUser.getRole() == Role.ROLE_MANAGER);
+        boolean isSelf = (reqUser != null && assignment.getEmployee().getId().equals(reqUser.getId())) || assignment.getEmployee().getId().equals(employeeId);
+        boolean isDirectReport = reqUser != null && assignment.getEmployee().getManager() != null && assignment.getEmployee().getManager().getId().equals(reqUser.getId());
+
+        if (!isSelf && !isDirectReport && !isHrOrManager) {
             throw new AccessDeniedException("Unauthorized access to report");
         }
 
