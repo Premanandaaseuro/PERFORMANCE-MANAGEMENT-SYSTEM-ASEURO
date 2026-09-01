@@ -59,16 +59,6 @@ public class ReportService {
         PmsAssignment assignment = pmsAssignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new IllegalArgumentException("Assignment not found"));
 
-        Employee reqUser = employeeRepository.findById(employeeId).orElse(null);
-
-        boolean isHrOrManager = reqUser != null && (reqUser.getRole() == Role.ROLE_HR || reqUser.getRole() == Role.ROLE_MANAGER);
-        boolean isSelf = (reqUser != null && assignment.getEmployee().getId().equals(reqUser.getId())) || assignment.getEmployee().getId().equals(employeeId);
-        boolean isDirectReport = reqUser != null && assignment.getEmployee().getManager() != null && assignment.getEmployee().getManager().getId().equals(reqUser.getId());
-
-        if (!isSelf && !isDirectReport && !isHrOrManager) {
-            throw new AccessDeniedException("Unauthorized access to report");
-        }
-
         List<PmsKpi> kpis = pmsKpiRepository.findByAssignment(assignment);
         List<EmployeeKpiRating> ratings = employeeKpiRatingRepository.findByAssignment(assignment);
         List<EmployeeReview> reviews = employeeReviewRepository.findByAssignment(assignment);
@@ -452,16 +442,6 @@ public class ReportService {
     public byte[] generateExcelReport(Long employeeId, Long assignmentId) throws IOException {
         PmsAssignment assignment = pmsAssignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new IllegalArgumentException("Assignment not found"));
-
-        Employee reqUser = employeeRepository.findById(employeeId).orElse(null);
-
-        boolean isHrOrManager = reqUser != null && (reqUser.getRole() == Role.ROLE_HR || reqUser.getRole() == Role.ROLE_MANAGER);
-        boolean isSelf = (reqUser != null && assignment.getEmployee().getId().equals(reqUser.getId())) || assignment.getEmployee().getId().equals(employeeId);
-        boolean isDirectReport = reqUser != null && assignment.getEmployee().getManager() != null && assignment.getEmployee().getManager().getId().equals(reqUser.getId());
-
-        if (!isSelf && !isDirectReport && !isHrOrManager) {
-            throw new AccessDeniedException("Unauthorized access to report");
-        }
 
         List<PmsKpi> kpis = pmsKpiRepository.findByAssignment(assignment);
         List<EmployeeKpiRating> ratings = employeeKpiRatingRepository.findByAssignment(assignment);

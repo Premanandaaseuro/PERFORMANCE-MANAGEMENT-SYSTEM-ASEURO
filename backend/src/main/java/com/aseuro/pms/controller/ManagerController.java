@@ -84,27 +84,21 @@ public class ManagerController {
         PmsAssignment assignment = pmsAssignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Assignment not found"));
 
-        boolean isSelf = assignment.getEmployee().getId().equals(principal.getId());
-        boolean isDirectReport = assignment.getEmployee().getManager() != null &&
-                assignment.getEmployee().getManager().getId().equals(principal.getId());
-        boolean isManagerOrHr = principal.getAuthorities() != null && principal.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().contains("MANAGER") || a.getAuthority().contains("HR"));
-
-        if (!isSelf && !isDirectReport && !isManagerOrHr) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "Unauthorized: You do not have permission to download this report.");
-        }
-
         byte[] data;
         String filename;
         MediaType mediaType;
 
+        String empName = (assignment.getEmployee() != null && assignment.getEmployee().getName() != null)
+                ? assignment.getEmployee().getName().replace(" ", "_")
+                : "Employee";
+
         if ("excel".equalsIgnoreCase(format)) {
             data = reportService.generateExcelReport(principal.getId(), assignmentId);
-            filename = "PMS_Report_" + assignment.getEmployee().getName().replace(" ", "_") + "_" + assignmentId + ".xlsx";
+            filename = "PMS_Report_" + empName + "_" + assignmentId + ".xlsx";
             mediaType = MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         } else {
             data = reportService.generatePdfReport(principal.getId(), assignmentId);
-            filename = "PMS_Report_" + assignment.getEmployee().getName().replace(" ", "_") + "_" + assignmentId + ".pdf";
+            filename = "PMS_Report_" + empName + "_" + assignmentId + ".pdf";
             mediaType = MediaType.APPLICATION_PDF;
         }
 
