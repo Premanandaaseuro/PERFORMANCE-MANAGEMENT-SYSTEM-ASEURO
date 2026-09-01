@@ -28,6 +28,11 @@ services:
       - DB_USERNAME=postgres
       - DB_PASSWORD=postgres
       - SERVER_PORT=8081
+      - MAIL_HOST=${MAIL_HOST:-smtp-relay.brevo.com}
+      - MAIL_PORT=${MAIL_PORT:-587}
+      - MAIL_USERNAME=${MAIL_USERNAME:-b76bc3001@smtp-brevo.com}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - MAIL_FROM=${MAIL_FROM:-m.premananda@aseuro.in}
     depends_on:
       postgres:
         condition: service_healthy

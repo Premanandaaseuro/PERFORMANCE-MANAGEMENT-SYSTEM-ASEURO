@@ -5,6 +5,7 @@ import com.aseuro.pms.exception.ApiException;
 import com.aseuro.pms.model.*;
 import com.aseuro.pms.repository.*;
 import com.aseuro.pms.security.UserPrincipal;
+import com.aseuro.pms.service.EmailService;
 import com.aseuro.pms.service.HrKpiService;
 import com.aseuro.pms.service.HrLifecycleService;
 import com.aseuro.pms.service.ReportService;
@@ -40,6 +41,7 @@ public class HrManagementController {
     private final HrKpiService hrKpiService;
     private final HrLifecycleService hrLifecycleService;
     private final ReportService reportService;
+    private final EmailService emailService;
 
     // 1. Dashboard Overview Stats
     @GetMapping("/dashboard")
@@ -158,8 +160,11 @@ public class HrManagementController {
 
         Employee saved = employeeRepository.save(manager);
 
+        // Send welcome email with login credentials
+        emailService.sendWelcomeEmail(saved.getEmail(), saved.getName(), request.getPassword(), "Manager");
+
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
-                "message", "Manager created successfully.",
+                "message", "Manager created successfully. Welcome email with login details has been sent.",
                 "id", saved.getId(),
                 "name", saved.getName(),
                 "email", saved.getEmail()
@@ -277,8 +282,11 @@ public class HrManagementController {
             pmsKpiRepository.saveAll(assignedKpis);
         }
 
+        // Send welcome email with login credentials
+        emailService.sendWelcomeEmail(saved.getEmail(), saved.getName(), request.getPassword(), saved.getRole() == Role.ROLE_MANAGER ? "Manager" : "Employee");
+
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
-                "message", "Employee created and KPIs assigned successfully.",
+                "message", "Employee created and KPIs assigned successfully. Welcome email with login details has been sent.",
                 "id", saved.getId(),
                 "name", saved.getName(),
                 "email", saved.getEmail(),
