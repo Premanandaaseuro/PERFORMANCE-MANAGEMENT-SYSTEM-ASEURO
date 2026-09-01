@@ -64,6 +64,11 @@ export const hrApi = {
     return response.data;
   },
 
+  deleteEmployee: async (id: number): Promise<{ message: string; id: number }> => {
+    const response = await apiClient.delete<{ message: string; id: number }>(`/api/hr/employees/${id}`);
+    return response.data;
+  },
+
   getKpiMasterList: async (designation?: string): Promise<KpiMasterItem[]> => {
     const response = await apiClient.get<KpiMasterItem[]>('/api/hr/kpis', {
       params: designation ? { designation } : {}

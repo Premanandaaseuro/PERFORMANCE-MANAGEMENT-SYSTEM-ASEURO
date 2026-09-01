@@ -42,6 +42,10 @@ public class HrManagementController {
     private final HrLifecycleService hrLifecycleService;
     private final ReportService reportService;
     private final EmailService emailService;
+    private final EmployeeKpiRatingRepository employeeKpiRatingRepository;
+    private final EmployeeReviewRepository employeeReviewRepository;
+    private final PmsHistoryRepository pmsHistoryRepository;
+    private final FinalPmsResultRepository finalPmsResultRepository;
 
     // 1. Dashboard Overview Stats
     @GetMapping("/dashboard")
@@ -346,6 +350,58 @@ public class HrManagementController {
                 "role", saved.getRole().name().replace("ROLE_", ""),
                 "designation", saved.getDesignation() != null ? saved.getDesignation() : "-",
                 "department", saved.getDepartment() != null ? saved.getDepartment() : "-"
+        ));
+    }
+
+    // Delete Employee and all associated records
+    @DeleteMapping("/employees/{id}")
+    @Transactional
+    public ResponseEntity<Map<String, Object>> deleteEmployee(@PathVariable Long id) {
+        Employee employee = employeeRepository.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Employee not found."));
+
+        // 1. Unassign manager reference from direct reports
+        List<Employee> subordinates = employeeRepository.findByManager(employee);
+        for (Employee sub : subordinates) {
+            sub.setManager(null);
+        }
+        if (!subordinates.isEmpty()) {
+            employeeRepository.saveAll(subordinates);
+        }
+
+        // 2. Delete review records where this employee was the reviewer
+        List<EmployeeReview> allReviews = employeeReviewRepository.findAll();
+        for (EmployeeReview r : allReviews) {
+            if (r.getReviewer() != null && r.getReviewer().getId().equals(id)) {
+                employeeReviewRepository.delete(r);
+            }
+        }
+
+        // 3. Delete PMS assignments and their associated ratings, reviews, and KPIs
+        List<PmsAssignment> assignments = pmsAssignmentRepository.findByEmployee(employee);
+        for (PmsAssignment a : assignments) {
+            finalPmsResultRepository.findByAssignment(a).ifPresent(finalPmsResultRepository::delete);
+            List<EmployeeKpiRating> ratings = employeeKpiRatingRepository.findByAssignment(a);
+            employeeKpiRatingRepository.deleteAll(ratings);
+            List<EmployeeReview> reviews = employeeReviewRepository.findByAssignment(a);
+            employeeReviewRepository.deleteAll(reviews);
+            List<PmsKpi> kpis = pmsKpiRepository.findByAssignment(a);
+            pmsKpiRepository.deleteAll(kpis);
+            pmsAssignmentRepository.delete(a);
+        }
+
+        // 4. Delete PMS history
+        List<PmsHistory> history = pmsHistoryRepository.findByEmployee(employee);
+        if (!history.isEmpty()) {
+            pmsHistoryRepository.deleteAll(history);
+        }
+
+        // 5. Delete employee record
+        employeeRepository.delete(employee);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Employee " + employee.getName() + " deleted successfully.",
+                "id", id
         ));
     }
 

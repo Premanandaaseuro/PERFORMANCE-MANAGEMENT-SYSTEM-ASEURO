@@ -12,7 +12,8 @@ import {
   CheckCircle2,
   X,
   ShieldCheck,
-  UserCheck
+  UserCheck,
+  Trash2
 } from 'lucide-react';
 
 export const HrEmployeeDirectoryPage: React.FC = () => {
@@ -34,6 +35,7 @@ export const HrEmployeeDirectoryPage: React.FC = () => {
   const [editAccountStatus, setEditAccountStatus] = useState('ACTIVE');
 
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const fetchEmployeesAndManagers = () => {
@@ -94,6 +96,25 @@ export const HrEmployeeDirectoryPage: React.FC = () => {
       alert('Failed to update employee details.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteEmployee = async (id: number, name: string) => {
+    if (!window.confirm(`Are you sure you want to permanently delete employee "${name}"? This action cannot be undone.`)) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      await hrApi.deleteEmployee(id);
+      setToastMessage(`Employee "${name}" deleted successfully.`);
+      setTimeout(() => setToastMessage(null), 3000);
+      closeEditModal();
+      fetchEmployeesAndManagers();
+    } catch (err: any) {
+      console.error('Failed to delete employee:', err);
+      alert(err.response?.data?.message || 'Failed to delete employee. Please try again.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -249,7 +270,7 @@ export const HrEmployeeDirectoryPage: React.FC = () => {
                         {emp.accountStatus || emp.status || 'ACTIVE'}
                       </span>
                     </td>
-                    <td className="px-5 py-4 whitespace-nowrap text-right">
+                    <td className="px-5 py-4 whitespace-nowrap text-right space-x-1.5">
                       <button
                         onClick={() => openEditModal(emp)}
                         className="inline-flex items-center space-x-1 px-3 py-1.5 bg-slate-100 hover:bg-pms-green hover:text-white text-slate-700 rounded-lg text-xs font-bold transition-colors"
@@ -257,6 +278,15 @@ export const HrEmployeeDirectoryPage: React.FC = () => {
                       >
                         <Edit3 size={13} />
                         <span>Edit / Promote</span>
+                      </button>
+                      <button
+                        onClick={() => handleDeleteEmployee(emp.id, emp.name || emp.fullName || '')}
+                        disabled={deleting}
+                        className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-600 rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
+                        title="Delete Employee"
+                      >
+                        <Trash2 size={13} />
+                        <span>Delete</span>
                       </button>
                     </td>
                   </tr>
@@ -407,21 +437,32 @@ export const HrEmployeeDirectoryPage: React.FC = () => {
               </div>
 
               {/* Actions */}
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-end space-x-3">
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
                 <button
                   type="button"
-                  onClick={closeEditModal}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl"
+                  onClick={() => handleDeleteEmployee(editingEmp.id, editingEmp.name || editingEmp.fullName || '')}
+                  disabled={deleting}
+                  className="inline-flex items-center space-x-1.5 px-4 py-2 bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-600 border border-rose-200 hover:border-rose-600 text-xs font-bold rounded-xl transition-all disabled:opacity-50"
                 >
-                  Cancel
+                  <Trash2 size={14} />
+                  <span>{deleting ? 'Deleting...' : 'Delete Employee'}</span>
                 </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-5 py-2 bg-pms-green hover:bg-pms-darkGreen text-white text-xs font-bold rounded-xl shadow-sm transition-all disabled:opacity-50"
-                >
-                  {saving ? 'Saving...' : 'Save & Update Staff'}
-                </button>
+                <div className="flex items-center space-x-3">
+                  <button
+                    type="button"
+                    onClick={closeEditModal}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="px-5 py-2 bg-pms-green hover:bg-pms-darkGreen text-white text-xs font-bold rounded-xl shadow-sm transition-all disabled:opacity-50"
+                  >
+                    {saving ? 'Saving...' : 'Save & Update Staff'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
