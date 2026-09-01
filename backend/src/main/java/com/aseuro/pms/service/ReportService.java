@@ -59,8 +59,7 @@ public class ReportService {
         PmsAssignment assignment = pmsAssignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new IllegalArgumentException("Assignment not found"));
 
-        Employee reqUser = employeeRepository.findById(employeeId)
-                .orElseGet(() -> employeeRepository.findByUserId(employeeId).orElse(null));
+        Employee reqUser = employeeRepository.findById(employeeId).orElse(null);
 
         boolean isHrOrManager = reqUser != null && (reqUser.getRole() == Role.ROLE_HR || reqUser.getRole() == Role.ROLE_MANAGER);
         boolean isSelf = (reqUser != null && assignment.getEmployee().getId().equals(reqUser.getId())) || assignment.getEmployee().getId().equals(employeeId);
@@ -454,8 +453,7 @@ public class ReportService {
         PmsAssignment assignment = pmsAssignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new IllegalArgumentException("Assignment not found"));
 
-        Employee reqUser = employeeRepository.findById(employeeId)
-                .orElseGet(() -> employeeRepository.findByUserId(employeeId).orElse(null));
+        Employee reqUser = employeeRepository.findById(employeeId).orElse(null);
 
         boolean isHrOrManager = reqUser != null && (reqUser.getRole() == Role.ROLE_HR || reqUser.getRole() == Role.ROLE_MANAGER);
         boolean isSelf = (reqUser != null && assignment.getEmployee().getId().equals(reqUser.getId())) || assignment.getEmployee().getId().equals(employeeId);
