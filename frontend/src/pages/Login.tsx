@@ -11,23 +11,18 @@ import {
   BarChart3,
   Sprout,
   AlertCircle,
-  UserCheck,
-  Users,
-  ShieldCheck,
   X,
   KeyRound,
   CheckCircle2,
   Clock,
-  ShieldAlert,
-  RotateCcw
+  ShieldAlert
 } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [role, setRole] = useState<'EMPLOYEE' | 'MANAGER' | 'HR'>('EMPLOYEE');
-  const [email, setEmail] = useState('employee@aseuro.com');
-  const [password, setPassword] = useState('password');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -35,13 +30,55 @@ export const Login: React.FC = () => {
   // Lockout State (5 failed attempts -> 5 minutes lock)
   const [lockSecondsRemaining, setLockSecondsRemaining] = useState<number>(0);
 
+  // Restore Lockout State from localStorage across page refreshes
+  useEffect(() => {
+    const storedLockout = localStorage.getItem('pms_lockout');
+    if (storedLockout) {
+      try {
+        const { email: lockedEmail, unlockTime } = JSON.parse(storedLockout);
+        const remaining = Math.ceil((unlockTime - Date.now()) / 1000);
+        if (remaining > 0) {
+          setLockSecondsRemaining(remaining);
+          if (lockedEmail) {
+            setEmail(lockedEmail);
+          }
+        } else {
+          localStorage.removeItem('pms_lockout');
+        }
+      } catch {
+        localStorage.removeItem('pms_lockout');
+      }
+    }
+  }, []);
+
   useEffect(() => {
     if (lockSecondsRemaining <= 0) return;
 
     const timer = setInterval(() => {
+      const storedLockout = localStorage.getItem('pms_lockout');
+      if (storedLockout) {
+        try {
+          const { unlockTime } = JSON.parse(storedLockout);
+          const remaining = Math.max(0, Math.ceil((unlockTime - Date.now()) / 1000));
+          if (remaining <= 0) {
+            clearInterval(timer);
+            localStorage.removeItem('pms_lockout');
+            setLockSecondsRemaining(0);
+            setError(null);
+          } else {
+            setLockSecondsRemaining(remaining);
+          }
+          return;
+        } catch {
+          // fallback
+        }
+      }
+
       setLockSecondsRemaining((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
+          localStorage.removeItem('pms_lockout');
+          setError(null);
           return 0;
         }
         return prev - 1;
@@ -57,19 +94,6 @@ export const Login: React.FC = () => {
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const handleSkipLockTimer = async () => {
-    try {
-      if (email) {
-        await authApi.resetLockout(email.trim());
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLockSecondsRemaining(0);
-      setError(null);
-    }
-  };
-
   // Forgot Password Modal State
   const [forgotPasswordModalOpen, setForgotPasswordModalOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
@@ -80,22 +104,6 @@ export const Login: React.FC = () => {
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetSuccess, setResetSuccess] = useState<string | null>(null);
   const [resetLoading, setResetLoading] = useState(false);
-
-  const handleRoleChange = (newRole: 'EMPLOYEE' | 'MANAGER' | 'HR') => {
-    setRole(newRole);
-    setError(null);
-    if (newRole === 'HR') {
-      setEmail('hr@aseuro.com');
-      setPassword('Hr@12345');
-    } else if (newRole === 'MANAGER') {
-      setEmail('manager@aseuro.com');
-      setPassword('password');
-    } else {
-      setEmail('employee@aseuro.com');
-      setPassword('password');
-    }
-  };
-
   const handleOpenForgotPassword = () => {
     setResetEmail(email || '');
     setNewPassword('');
@@ -117,7 +125,6 @@ export const Login: React.FC = () => {
       return;
     }
 
-    // Password criteria check: minimum 8 characters, alphabets, numbers, and special characters
     const isMinLength = newPassword.length >= 8;
     const hasAlphabet = /[a-zA-Z]/.test(newPassword);
     const hasNumber = /[0-9]/.test(newPassword);
@@ -168,11 +175,12 @@ export const Login: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      await login({ email: email.trim(), password, role });
+      await login({ email: email.trim(), password });
+      localStorage.removeItem('pms_lockout');
       
       const savedUserStr = localStorage.getItem('pms_user');
       const savedUser = savedUserStr ? JSON.parse(savedUserStr) : null;
-      const userRole = savedUser?.role || role;
+      const userRole = savedUser?.role;
 
       if (userRole === 'ROLE_HR' || userRole === 'HR') {
         navigate('/hr/dashboard');
@@ -185,6 +193,11 @@ export const Login: React.FC = () => {
       console.error(err);
       const resData = err.response?.data;
       if (resData?.lockedUntilSeconds) {
+        const unlockTime = Date.now() + resData.lockedUntilSeconds * 1000;
+        localStorage.setItem(
+          'pms_lockout',
+          JSON.stringify({ email: email.trim(), unlockTime })
+        );
         setLockSecondsRemaining(resData.lockedUntilSeconds);
       }
       if (resData?.message) {
@@ -287,50 +300,7 @@ export const Login: React.FC = () => {
               Sign in to access your account
             </p>
 
-            {/* Quick Role Switcher */}
-            <div className="w-full mb-5">
-              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 text-center">
-                Select Login Role
-              </label>
-              <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
-                <button
-                  type="button"
-                  onClick={() => handleRoleChange('EMPLOYEE')}
-                  className={`flex items-center justify-center space-x-1 py-2 text-xs font-bold rounded-xl transition-all ${
-                    role === 'EMPLOYEE'
-                      ? 'bg-white text-emerald-700 shadow-sm border border-slate-200/80'
-                      : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  <UserCheck size={14} />
-                  <span>Employee</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleRoleChange('MANAGER')}
-                  className={`flex items-center justify-center space-x-1 py-2 text-xs font-bold rounded-xl transition-all ${
-                    role === 'MANAGER'
-                      ? 'bg-white text-emerald-700 shadow-sm border border-slate-200/80'
-                      : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  <Users size={14} />
-                  <span>Manager</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleRoleChange('HR')}
-                  className={`flex items-center justify-center space-x-1 py-2 text-xs font-bold rounded-xl transition-all ${
-                    role === 'HR'
-                      ? 'bg-white text-emerald-700 shadow-sm border border-slate-200/80'
-                      : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  <ShieldCheck size={14} />
-                  <span>HR</span>
-                </button>
-              </div>
-            </div>
+
 
             {/* Form */}
             <form className="w-full space-y-4" onSubmit={handleSubmit}>
@@ -344,24 +314,13 @@ export const Login: React.FC = () => {
                   <p className="text-xs text-center font-medium text-amber-700">
                     5 failed login attempts detected. Please wait for the 5-minute timer before trying again.
                   </p>
-                  <div className="flex items-center space-x-3 mt-1">
+                  <div className="flex items-center justify-center mt-1">
                     <div className="flex items-center space-x-2 bg-white px-4 py-1.5 rounded-xl border border-amber-200 shadow-xs">
                       <Clock size={16} className="text-amber-600" />
                       <span className="text-sm font-black font-mono text-amber-900">
                         {formatLockTime(lockSecondsRemaining)}
                       </span>
                     </div>
-
-                    {/* Developer Reset Timer Button */}
-                    <button
-                      type="button"
-                      onClick={handleSkipLockTimer}
-                      className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center space-x-1 hover:scale-105 active:scale-95"
-                      title="Developer Shortcut: Skip 5-minute waiting timer"
-                    >
-                      <RotateCcw size={13} />
-                      <span>Reset Timer</span>
-                    </button>
                   </div>
                 </div>
               )}
