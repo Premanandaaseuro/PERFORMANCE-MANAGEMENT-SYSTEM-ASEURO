@@ -1,12 +1,11 @@
 import axios from 'axios';
 
 const getApiBaseUrl = () => {
-  if (import.meta.env.VITE_API_BASE_URL && !import.meta.env.VITE_API_BASE_URL.endsWith('pms-backend.onrender.com')) {
+  if (import.meta.env.VITE_API_BASE_URL) {
     return import.meta.env.VITE_API_BASE_URL;
   }
   if (typeof window !== 'undefined' && window.location.hostname.includes('onrender.com')) {
-    const backendHost = window.location.hostname.replace('pms-frontend', 'pms-backend');
-    return `${window.location.protocol}//${backendHost}`;
+    return 'https://pms-backend-8wx3.onrender.com';
   }
   return 'http://localhost:8081';
 };
