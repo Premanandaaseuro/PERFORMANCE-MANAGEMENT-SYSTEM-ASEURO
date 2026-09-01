@@ -3,22 +3,24 @@ package com.aseuro.pms.service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 
 @Service
 public class EmailService {
 
     private static final Logger logger = LoggerFactory.getLogger(EmailService.class);
 
-    private final JavaMailSender mailSender;
+    @Value("${resend.api.key:${RESEND_API_KEY:}}")
+    private String resendApiKey;
 
-    @Value("${spring.mail.username:b76bc3001@smtp-brevo.com}")
-    private String senderEmail;
-
-    @Value("${app.mail.from:m.premananda@aseuro.in}")
+    @Value("${app.mail.from:${MAIL_FROM:onboarding@resend.dev}}")
     private String fromEmail;
 
     @Value("${app.portal.url:https://pms-frontend-kz6u.onrender.com/login}")
@@ -30,13 +32,12 @@ public class EmailService {
     @Value("${app.company.name:Aseuro Technologies}")
     private String companyName;
 
-    public EmailService(JavaMailSender mailSender) {
-        this.mailSender = mailSender;
-    }
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .build();
 
     /**
      * Sends welcome email with login credentials to newly created Employee or Manager.
-     * If SMTP is not configured or in local development, outputs formatted email to console.
      */
     @Async
     public void sendWelcomeEmail(String recipientEmail, String recipientName, String rawPassword, String roleName) {
@@ -55,38 +56,65 @@ public class EmailService {
                 "Please let me know if I can be of further assistance in helping you navigate the system.\n\n" +
                 "Regards\n" +
                 "Team HR\n" +
-                "HR Manager\n",
+                "HR Manager\n\n" +
+                "For access or login please click here: %s\n\n" +
+                "Regards,\n" +
+                "Team HR\n",
                 displayName,
                 displayName,
                 companyName,
                 portalUrl,
                 recipientEmail,
                 rawPassword,
-                companyId
+                companyId,
+                portalUrl
         );
 
         logger.info("================================================================================");
         logger.info("[EMAIL DISPATCH] Sending welcome credentials email to: {}", recipientEmail);
         logger.info("Subject: {}", subject);
-        logger.info("\n{}", messageBody);
         logger.info("================================================================================");
 
-        if (senderEmail == null || senderEmail.trim().isEmpty() || senderEmail.contains("your-email")) {
-            senderEmail = "b76bc3001@smtp-brevo.com";
+        if (resendApiKey == null || resendApiKey.trim().isEmpty()) {
+            logger.info("[EMAIL SERVICE] Resend API key not set. Set RESEND_API_KEY environment variable.");
+            return;
         }
 
         try {
-            SimpleMailMessage mailMessage = new SimpleMailMessage();
-            String fromAddress = (fromEmail != null && !fromEmail.trim().isEmpty()) ? fromEmail.trim() : "premanandabspp@gmail.com";
-            mailMessage.setFrom(fromAddress);
-            mailMessage.setTo(recipientEmail);
-            mailMessage.setSubject(subject);
-            mailMessage.setText(messageBody);
+            String from = (fromEmail != null && !fromEmail.trim().isEmpty()) ? fromEmail : "onboarding@resend.dev";
+            String jsonPayload = String.format(
+                    "{\"from\":\"%s\",\"to\":[\"%s\"],\"subject\":\"%s\",\"text\":\"%s\"}",
+                    escapeJson(from),
+                    escapeJson(recipientEmail),
+                    escapeJson(subject),
+                    escapeJson(messageBody)
+            );
 
-            mailSender.send(mailMessage);
-            logger.info("[EMAIL SERVICE] Successfully sent live email from {} to {}", fromAddress, recipientEmail);
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create("https://api.resend.com/emails"))
+                    .header("Authorization", "Bearer " + resendApiKey.trim())
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                logger.info("[EMAIL SERVICE] Successfully sent email via Resend to {}: {}", recipientEmail, response.body());
+            } else {
+                logger.error("[EMAIL SERVICE] Resend API error (status {}): {}", response.statusCode(), response.body());
+            }
         } catch (Exception e) {
-            logger.error("[EMAIL SERVICE] Failed to send email to {}: {}. Account was created successfully.", recipientEmail, e.getMessage(), e);
+            logger.error("[EMAIL SERVICE] Failed to send email via Resend to {}: {}", recipientEmail, e.getMessage(), e);
         }
+    }
+
+    private String escapeJson(String raw) {
+        if (raw == null) return "";
+        return raw.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
     }
 }
