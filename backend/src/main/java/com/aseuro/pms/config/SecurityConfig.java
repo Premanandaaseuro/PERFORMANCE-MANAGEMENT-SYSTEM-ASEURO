@@ -61,7 +61,7 @@ public class SecurityConfig {
                 .requestMatchers("/auth/**", "/api/auth/**").permitAll()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/api/hr/**", "/hr/**").hasAnyAuthority("HR", "ROLE_HR")
-                .requestMatchers("/api/manager/**", "/manager/**").hasAnyAuthority("MANAGER", "ROLE_MANAGER")
+                .requestMatchers("/api/manager/**", "/manager/**").hasAnyAuthority("MANAGER", "ROLE_MANAGER", "HR", "ROLE_HR")
                 .requestMatchers("/employee/**", "/api/employee/**").hasAnyAuthority("EMPLOYEE", "ROLE_EMPLOYEE", "MANAGER", "ROLE_MANAGER", "HR", "ROLE_HR")
                 .anyRequest().authenticated()
             );
@@ -76,8 +76,8 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(Collections.singletonList("*"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));
-        configuration.setExposedHeaders(Collections.singletonList("Authorization"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers"));
+        configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Disposition"));
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

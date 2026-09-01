@@ -26,7 +26,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/manager")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyAuthority('MANAGER', 'ROLE_MANAGER')")
+@PreAuthorize("hasAnyAuthority('MANAGER', 'ROLE_MANAGER', 'HR', 'ROLE_HR')")
 public class ManagerController {
 
     private final ManagerService managerService;
