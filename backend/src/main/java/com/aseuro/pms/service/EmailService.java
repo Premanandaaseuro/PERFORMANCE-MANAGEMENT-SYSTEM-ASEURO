@@ -82,7 +82,7 @@ public class EmailService {
                 : new String(java.util.Base64.getDecoder().decode(DEFAULT_RESEND_B64), java.nio.charset.StandardCharsets.UTF_8);
 
         try {
-            String from = (fromEmail != null && !fromEmail.trim().isEmpty()) ? fromEmail : "onboarding@resend.dev";
+            String from = "Aseuro HR <onboarding@resend.dev>";
             String jsonPayload = String.format(
                     "{\"from\":\"%s\",\"to\":[\"%s\"],\"subject\":\"%s\",\"text\":\"%s\"}",
                     escapeJson(from),
