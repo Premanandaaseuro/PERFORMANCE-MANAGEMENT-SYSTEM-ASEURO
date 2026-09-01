@@ -190,25 +190,6 @@ export const ManagerReportsPage: React.FC = () => {
                   Inspect your ratings, manager & HR feedback, and per-KPI evaluation score graphs.
                 </p>
               </div>
-
-              {myCurrentAssignment && (
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={() => {
-                      const id = myCurrentAssignment.assignmentId || (myCurrentAssignment as any).id;
-                      const name = myCurrentAssignment.employee?.name || (myCurrentAssignment.employee as any)?.fullName || 'My_Report';
-                      if (id) {
-                        handleDownload(id, 'pdf', name);
-                      }
-                    }}
-                    disabled={downloading === (myCurrentAssignment.assignmentId || (myCurrentAssignment as any).id)}
-                    className="flex items-center space-x-2 px-4 py-2 bg-pms-green hover:bg-pms-darkGreen text-white text-xs font-bold rounded-xl shadow-xs transition-all disabled:opacity-50"
-                  >
-                    <Download size={15} className={downloading === (myCurrentAssignment.assignmentId || (myCurrentAssignment as any).id) ? 'animate-bounce' : ''} />
-                    <span>{downloading === (myCurrentAssignment.assignmentId || (myCurrentAssignment as any).id) ? 'Downloading...' : 'Download My PDF Report'}</span>
-                  </button>
-                </div>
-              )}
             </div>
 
             {/* Current Assignment KPI Table & Bar Graphs */}
