@@ -77,7 +77,7 @@ public class EmailService {
 
         try {
             SimpleMailMessage mailMessage = new SimpleMailMessage();
-            String fromAddress = (fromEmail != null && !fromEmail.trim().isEmpty()) ? fromEmail.trim() : "m.premananda@aseuro.in";
+            String fromAddress = (fromEmail != null && !fromEmail.trim().isEmpty()) ? fromEmail.trim() : "premanandabspp@gmail.com";
             mailMessage.setFrom(fromAddress);
             mailMessage.setTo(recipientEmail);
             mailMessage.setSubject(subject);
