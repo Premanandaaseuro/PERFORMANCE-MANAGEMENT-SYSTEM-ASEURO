@@ -387,7 +387,7 @@ export const ManagerReportsPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Action Buttons: View & Download PDF */}
+                    {/* Action Buttons: View Only */}
                     <div className="pt-3 border-t border-slate-100 flex items-center justify-end space-x-3">
                       <button
                         onClick={() => navigate(`/history/${h.assignmentId || h.id}`)}
@@ -396,16 +396,6 @@ export const ManagerReportsPage: React.FC = () => {
                       >
                         <Eye size={15} />
                         <span>View</span>
-                      </button>
-
-                      <button
-                        onClick={() => handleDownload(h.assignmentId || h.id, 'pdf', 'My_Report')}
-                        disabled={downloading === (h.assignmentId || h.id)}
-                        className="px-4 py-2 bg-pms-green hover:bg-pms-darkGreen text-white rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1.5 shadow disabled:opacity-50"
-                        title="Download PDF report"
-                      >
-                        <Download size={15} className={downloading === (h.assignmentId || h.id) ? 'animate-bounce' : ''} />
-                        <span>{downloading === (h.assignmentId || h.id) ? 'Downloading...' : 'Download PDF'}</span>
                       </button>
                     </div>
                   </div>
