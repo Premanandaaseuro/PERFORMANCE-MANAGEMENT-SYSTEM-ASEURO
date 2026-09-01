@@ -43,6 +43,3 @@ services:
     dockerfilePath: ./frontend/Dockerfile
     dockerContext: ./frontend
     plan: free
-    envVars:
-      - key: VITE_API_BASE_URL
-        value: https://pms-backend.onrender.com

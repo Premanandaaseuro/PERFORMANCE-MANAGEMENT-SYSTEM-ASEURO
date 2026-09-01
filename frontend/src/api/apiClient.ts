@@ -1,6 +1,17 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
+const getApiBaseUrl = () => {
+  if (import.meta.env.VITE_API_BASE_URL && !import.meta.env.VITE_API_BASE_URL.endsWith('pms-backend.onrender.com')) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+  if (typeof window !== 'undefined' && window.location.hostname.includes('onrender.com')) {
+    const backendHost = window.location.hostname.replace('pms-frontend', 'pms-backend');
+    return `${window.location.protocol}//${backendHost}`;
+  }
+  return 'http://localhost:8081';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
