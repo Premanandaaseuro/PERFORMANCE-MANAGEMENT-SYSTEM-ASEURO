@@ -15,7 +15,7 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
-    @Value("${spring.mail.username:}")
+    @Value("${spring.mail.username:b76bc3001@smtp-brevo.com}")
     private String senderEmail;
 
     @Value("${app.mail.from:m.premananda@aseuro.in}")
@@ -71,15 +71,13 @@ public class EmailService {
         logger.info("\n{}", messageBody);
         logger.info("================================================================================");
 
-        // Check if SMTP credentials are provided
         if (senderEmail == null || senderEmail.trim().isEmpty() || senderEmail.contains("your-email")) {
-            logger.info("[EMAIL SERVICE] Real SMTP username not configured. Email logged to console above for local verification.");
-            return;
+            senderEmail = "b76bc3001@smtp-brevo.com";
         }
 
         try {
             SimpleMailMessage mailMessage = new SimpleMailMessage();
-            String fromAddress = (fromEmail != null && !fromEmail.trim().isEmpty()) ? fromEmail.trim() : senderEmail;
+            String fromAddress = (fromEmail != null && !fromEmail.trim().isEmpty()) ? fromEmail.trim() : "m.premananda@aseuro.in";
             mailMessage.setFrom(fromAddress);
             mailMessage.setTo(recipientEmail);
             mailMessage.setSubject(subject);
@@ -88,7 +86,7 @@ public class EmailService {
             mailSender.send(mailMessage);
             logger.info("[EMAIL SERVICE] Successfully sent live email from {} to {}", fromAddress, recipientEmail);
         } catch (Exception e) {
-            logger.error("[EMAIL SERVICE] Failed to send email to {}: {}. Account was created successfully.", recipientEmail, e.getMessage());
+            logger.error("[EMAIL SERVICE] Failed to send email to {}: {}. Account was created successfully.", recipientEmail, e.getMessage(), e);
         }
     }
 }
