@@ -37,12 +37,12 @@ public class EmailService {
     @Async
     public void sendWelcomeEmail(String recipientEmail, String recipientName, String rawPassword, String roleName) {
         String displayName = (recipientName != null && !recipientName.trim().isEmpty()) ? recipientName.trim() : "Team Member";
-        String subject = "Welcome to " + companyName + " HR System — Your Account Credentials";
+        String subject = "Notification: Welcome email";
 
         String messageBody = String.format(
                 "Dear %s,\n\n" +
                 "Hi %s,\n\n" +
-                "Welcome to our HR System %s\n" +
+                "Welcome to our HR System PMS ASEURO\n" +
                 "The login details to the system are as follows and I would like you to go to your My profile section and update all your data.\n\n" +
                 "URL: %s\n" +
                 "User Name: %s\n" +
@@ -57,7 +57,6 @@ public class EmailService {
                 "Team HR\n",
                 displayName,
                 displayName,
-                companyName,
                 portalUrl,
                 recipientEmail,
                 rawPassword,
