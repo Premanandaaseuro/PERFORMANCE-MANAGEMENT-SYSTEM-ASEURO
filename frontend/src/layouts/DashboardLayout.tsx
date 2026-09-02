@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import aseuroLogo from '../assets/aseuro-logo.png';
 import {
   LayoutDashboard,
   Target,
@@ -94,8 +95,8 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         {/* Brand Header */}
         <div className="h-18 md:h-20 flex items-center px-6 border-b border-slate-100 bg-white">
           <div className="flex items-center space-x-3.5">
-            <div className="w-10 h-10 rounded-xl bg-pms-green flex items-center justify-center text-white font-bold text-xl shadow-sm">
-              P
+            <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center shadow-sm overflow-hidden p-1">
+              <img src={aseuroLogo} alt="Aseuro Logo" className="w-full h-full object-contain" />
             </div>
             <div>
               <span className="font-bold text-pms-gray text-xl tracking-tight">ASEURO</span>
@@ -149,8 +150,8 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       {/* Mobile Top Header */}
       <header className="md:hidden h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sticky top-0 z-40">
         <div className="flex items-center space-x-3">
-          <div className="w-9 h-9 rounded-lg bg-pms-green flex items-center justify-center text-white font-bold text-lg shadow-sm">
-            P
+          <div className="w-9 h-9 rounded-lg bg-white border border-slate-100 flex items-center justify-center shadow-sm overflow-hidden p-0.5">
+            <img src={aseuroLogo} alt="Aseuro Logo" className="w-full h-full object-contain" />
           </div>
           <div>
             <span className="font-bold text-pms-gray tracking-tight">ASEURO</span>
@@ -174,8 +175,8 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
           <aside className="w-72 max-w-[85vw] h-full bg-white flex flex-col shadow-2xl relative" onClick={(e) => e.stopPropagation()}>
             <div className="h-18 flex items-center px-6 border-b border-slate-100 justify-between">
               <div className="flex items-center space-x-3.5">
-                <div className="w-9 h-9 rounded-lg bg-pms-green flex items-center justify-center text-white font-bold text-lg shadow-sm">
-                  P
+                <div className="w-9 h-9 rounded-lg bg-white border border-slate-100 flex items-center justify-center shadow-sm overflow-hidden p-0.5">
+                  <img src={aseuroLogo} alt="Aseuro Logo" className="w-full h-full object-contain" />
                 </div>
                 <div>
                   <span className="font-bold text-pms-gray text-lg tracking-tight">ASEURO</span>
