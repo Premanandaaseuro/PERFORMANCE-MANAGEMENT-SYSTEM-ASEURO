@@ -78,7 +78,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
   ];
 
   const navigation = isHr ? hrNavigation : isManager ? managerNavigation : employeeNavigation;
-  const portalTitle = isHr ? 'HR Portal' : isManager ? 'Manager Portal' : 'PMS Portal';
+  const portalTitle = isHr ? 'HR Portal' : isManager ? 'Manager Portal' : 'Employee Portal';
   const headerContextTitle = isHr ? 'HR Administration' : isManager ? 'Manager Administration' : 'Employee Portal';
 
   const handleLogout = () => {
@@ -231,7 +231,10 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       <main className="flex-1 flex flex-col overflow-y-auto h-screen">
         {/* Top bar for desktop */}
         <header className="hidden md:flex h-18 md:h-20 bg-white border-b border-slate-200 items-center justify-between px-6 lg:px-10 shrink-0">
-          <div>
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 rounded-lg bg-white border border-slate-100 flex items-center justify-center shadow-2xs overflow-hidden p-0.5">
+              <img src={aseuroLogo} alt="Aseuro Logo" className="w-full h-full object-contain" />
+            </div>
             <h1 className="text-slate-500 font-medium text-sm flex items-center space-x-1.5">
               <span>{headerContextTitle}</span>
               <ChevronRight size={14} className="text-slate-300" />

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { managerApi } from '../../api/managerApi';
 import { ManagerDashboardData } from '../../types';
+import aseuroLogo from '../../assets/aseuro-logo.png';
 import {
   Users,
   Target,
@@ -83,9 +84,14 @@ export const ManagerDashboardPage: React.FC = () => {
       <div className="relative overflow-hidden bg-gradient-to-r from-pms-darkGreen via-pms-green to-emerald-700 rounded-3xl p-8 text-white shadow-xl shadow-pms-green/10">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center space-x-2 px-3 py-1 bg-white/15 backdrop-blur-md rounded-full text-xs font-semibold text-emerald-100 uppercase tracking-wider">
-              <ShieldCheck size={14} />
-              <span>Manager Portal • {stats.currentCycle}</span>
+            <div className="flex items-center space-x-3 mb-1">
+              <div className="w-12 h-12 rounded-2xl bg-white/95 p-1.5 shadow-md flex items-center justify-center shrink-0">
+                <img src={aseuroLogo} alt="Aseuro Logo" className="w-full h-full object-contain" />
+              </div>
+              <div className="inline-flex items-center space-x-2 px-3 py-1 bg-white/15 backdrop-blur-md rounded-full text-xs font-semibold text-emerald-100 uppercase tracking-wider">
+                <ShieldCheck size={14} />
+                <span>Manager Portal • {stats.currentCycle}</span>
+              </div>
             </div>
             <h1 className="text-3xl font-bold tracking-tight">Welcome back, {stats.managerName}!</h1>
             <p className="text-emerald-100 max-w-2xl text-sm leading-relaxed">

@@ -139,8 +139,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         <div className="lg:col-span-7 flex flex-col space-y-8 pr-0 lg:pr-6">
           {/* Logo Header */}
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center p-1.5 shadow-md shadow-emerald-600/20">
-              <img src={aseuroLogo} alt="Aseuro Logo" className="w-full h-full object-contain brightness-0 invert" />
+            <div className="w-10 h-10 rounded-xl bg-white border border-slate-150 flex items-center justify-center p-1 shadow-sm">
+              <img src={aseuroLogo} alt="Aseuro Logo" className="w-full h-full object-contain" />
             </div>
             <span className="text-3xl font-black tracking-tight text-slate-900">aseuro</span>
           </div>
@@ -201,8 +201,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             
             {/* Card Logo Header */}
             <div className="flex items-center space-x-2.5 mb-1">
-              <div className="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center p-1.5 shadow-sm">
-                <img src={aseuroLogo} alt="Aseuro Logo" className="w-full h-full object-contain brightness-0 invert" />
+              <div className="w-9 h-9 rounded-xl bg-white border border-slate-150 flex items-center justify-center p-1 shadow-xs">
+                <img src={aseuroLogo} alt="Aseuro Logo" className="w-full h-full object-contain" />
               </div>
               <span className="text-2xl font-black tracking-tight text-slate-900">aseuro</span>
             </div>

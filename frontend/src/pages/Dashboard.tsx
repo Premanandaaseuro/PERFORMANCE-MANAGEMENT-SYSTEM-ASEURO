@@ -4,6 +4,7 @@ import { pmsApi } from '../api/pmsApi';
 import { DashboardData, PmsAssignment } from '../types';
 import { Timeline } from '../components/Timeline';
 import { StatusBadge } from '../components/StatusBadge';
+import aseuroLogo from '../assets/aseuro-logo.png';
 import {
   Calendar,
   CheckCircle,
@@ -247,12 +248,17 @@ export const Dashboard: React.FC = () => {
   return (
     <div className="space-y-8 animate-fadeIn">
       {/* Welcome Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-pms-gray">Active Appraisal Dashboard</h2>
-          <p className="text-sm text-slate-500 mt-1">
-            Monitor and complete your performance evaluation milestones.
-          </p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="flex items-center space-x-3.5">
+          <div className="w-11 h-11 rounded-xl bg-slate-50 border border-slate-150 flex items-center justify-center p-1.5 shrink-0 shadow-xs">
+            <img src={aseuroLogo} alt="Aseuro" className="w-full h-full object-contain" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-pms-gray">Active Appraisal Dashboard</h2>
+            <p className="text-sm text-slate-500 mt-0.5">
+              Monitor and complete your performance evaluation milestones.
+            </p>
+          </div>
         </div>
         <div>
           <StatusBadge status={data.pmsStatus} />

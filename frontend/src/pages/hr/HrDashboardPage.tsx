@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { hrApi } from '../../api/hrApi';
 import { HrDashboardStats } from '../../types';
+import aseuroLogo from '../../assets/aseuro-logo.png';
 import {
   Users,
   UserPlus,
@@ -106,8 +107,8 @@ export const HrDashboardPage: React.FC = () => {
       {/* Header Greeting Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/70 shadow-sm">
         <div className="flex items-center space-x-4">
-          <div className="w-12 h-12 rounded-xl bg-pms-lightGreen border border-pms-green/20 flex items-center justify-center text-pms-darkGreen shadow-sm shrink-0">
-            <ShieldCheck size={28} />
+          <div className="w-12 h-12 rounded-xl bg-white border border-slate-200/80 flex items-center justify-center p-1.5 shadow-xs shrink-0">
+            <img src={aseuroLogo} alt="Aseuro" className="w-full h-full object-contain" />
           </div>
           <div>
             <h2 className="text-2xl font-bold text-pms-gray">HR Administration Dashboard</h2>
