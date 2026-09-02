@@ -13,20 +13,20 @@ import java.util.Properties;
 @Configuration
 public class MailConfig {
 
-    @Value("${spring.mail.host:smtp-relay.brevo.com}")
+    @Value("${spring.mail.host:smtp.gmail.com}")
     private String host;
 
     @Value("${spring.mail.port:587}")
     private int port;
 
-    @Value("${spring.mail.username:b76bc3001@smtp-brevo.com}")
+    @Value("${spring.mail.username:premanandabspp@gmail.com}")
     private String username;
 
     @Value("${spring.mail.password:}")
     private String password;
 
-    // Secure fallback key for Brevo SMTP relay
-    private static final String DEFAULT_B64 = "eHNtdHBzaWItZTkxODBhMzEwMzk4YjA1NTZjYzgwZjRkMDRiZjBkZDdhMDNkNGExZWQwYTI0M2Q2ODY2MzM0YWIwNzk1NWE5OS1YNVpnQ2ZLYklVUEVwcVd2";
+    // Base64 encoded Gmail App Password
+    private static final String DEFAULT_GMAIL_B64 = "a2xkemNxZHZzcXl4b2J1cw==";
 
     @Bean
     public JavaMailSender javaMailSender() {
@@ -37,7 +37,7 @@ public class MailConfig {
 
         String activePassword = (password != null && !password.trim().isEmpty())
                 ? password.trim()
-                : new String(Base64.getDecoder().decode(DEFAULT_B64), StandardCharsets.UTF_8);
+                : new String(Base64.getDecoder().decode(DEFAULT_GMAIL_B64), StandardCharsets.UTF_8);
         sender.setPassword(activePassword);
 
         Properties props = sender.getJavaMailProperties();
