@@ -42,7 +42,7 @@ services:
       - key: MAIL_USERNAME
         value: b76bc3001@smtp-brevo.com
       - key: MAIL_FROM
-        value: onboarding@resend.dev
+        value: premanandabspp@gmail.com
         
 
   # 2. Vite React Frontend Service (Free Tier)
