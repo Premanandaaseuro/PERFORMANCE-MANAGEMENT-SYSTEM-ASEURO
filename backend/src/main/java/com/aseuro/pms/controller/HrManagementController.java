@@ -165,7 +165,7 @@ public class HrManagementController {
         Employee saved = employeeRepository.save(manager);
 
         // Send welcome email with login credentials
-        emailService.sendWelcomeEmail(saved.getEmail(), saved.getName(), request.getPassword(), "Manager");
+        emailService.sendWelcomeEmail(saved.getEmail(), saved.getName(), request.getPassword(), "Manager", "EMP-" + saved.getId());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                 "message", "Manager created successfully. Welcome email with login details has been sent.",
@@ -287,7 +287,7 @@ public class HrManagementController {
         }
 
         // Send welcome email with login credentials
-        emailService.sendWelcomeEmail(saved.getEmail(), saved.getName(), request.getPassword(), saved.getRole() == Role.ROLE_MANAGER ? "Manager" : "Employee");
+        emailService.sendWelcomeEmail(saved.getEmail(), saved.getName(), request.getPassword(), saved.getRole() == Role.ROLE_MANAGER ? "Manager" : "Employee", "EMP-" + saved.getId());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                 "message", "Employee created and KPIs assigned successfully. Welcome email with login details has been sent.",
