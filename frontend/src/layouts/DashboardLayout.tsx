@@ -70,6 +70,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
 
   const hrNavigation = [
     { name: 'Dashboard', href: '/hr/dashboard', icon: <LayoutDashboard size={20} /> },
+    { name: 'View My KPIs', href: '/hr/my-kpis', icon: <Target size={20} /> },
     { name: 'Add Employee', href: '/hr/employees/add', icon: <UserPlus size={20} /> },
     { name: 'Employee Directory', href: '/hr/employees', icon: <Users size={20} /> },
     { name: 'Add/Edit KPIs', href: '/hr/kpis', icon: <Target size={20} /> },

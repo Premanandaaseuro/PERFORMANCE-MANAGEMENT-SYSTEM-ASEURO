@@ -193,6 +193,14 @@ export const App: React.FC = () => {
             }
           />
           <Route
+            path="/hr/my-kpis"
+            element={
+              <ProtectedRoute requiredRole="HR">
+                <MyKpis />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/hr/employees"
             element={
               <ProtectedRoute requiredRole="HR">
