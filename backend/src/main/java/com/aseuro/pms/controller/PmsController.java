@@ -61,8 +61,10 @@ public class PmsController {
     }
 
     @GetMapping("/history")
-    public ResponseEntity<List<PmsHistoryDto>> getHistory(@AuthenticationPrincipal UserPrincipal userPrincipal) {
-        List<PmsHistoryDto> history = pmsService.getPmsHistory(userPrincipal.getId());
+    public ResponseEntity<List<PmsHistoryDto>> getHistory(
+            @RequestParam(required = false) Long employeeId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        List<PmsHistoryDto> history = pmsService.getPmsHistoryForCaller(userPrincipal.getId(), employeeId);
         return ResponseEntity.ok(history);
     }
 

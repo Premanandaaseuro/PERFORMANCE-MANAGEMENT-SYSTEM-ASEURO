@@ -12,6 +12,7 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UpdateEmployeeRequest {
+    private String employeeCode;
     private String name;
     private String fullName;
     private String email;

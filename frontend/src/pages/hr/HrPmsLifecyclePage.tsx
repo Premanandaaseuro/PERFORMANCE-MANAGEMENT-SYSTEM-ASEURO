@@ -90,11 +90,11 @@ export const HrPmsLifecyclePage: React.FC = () => {
     let weightedSum = 0;
     let totalWeight = 0;
     kpis.forEach((kpi) => {
-      const r = ratingsMap[kpi.kpiId] ?? kpi.hrRating ?? kpi.managerRating ?? kpi.selfRating ?? 5.0;
+      const r = ratingsMap[kpi.kpiId] ?? kpi.hrRating ?? 0;
       weightedSum += r * (kpi.weightage / 100);
       totalWeight += kpi.weightage;
     });
-    const calculated = totalWeight > 0 ? Math.round(weightedSum * 100) / 100 : 5.0;
+    const calculated = totalWeight > 0 ? Math.round(weightedSum * 100) / 100 : 0.0;
     setHrScore(calculated);
     deriveGrade(calculated);
   };
@@ -115,9 +115,9 @@ export const HrPmsLifecyclePage: React.FC = () => {
         const initialHrComments: Record<number, string> = {};
 
         data.kpis.forEach((kpi) => {
-          initialHrRatings[kpi.kpiId] = kpi.hrRating ?? kpi.managerRating ?? kpi.selfRating ?? 5.0;
-          initialMgrRatings[kpi.kpiId] = kpi.managerRating ?? kpi.selfRating ?? 5.0;
-          initialSelfRatings[kpi.kpiId] = kpi.selfRating ?? 5.0;
+          initialHrRatings[kpi.kpiId] = (kpi.hrRating !== null && kpi.hrRating !== undefined) ? kpi.hrRating : 0;
+          initialMgrRatings[kpi.kpiId] = (kpi.managerRating !== null && kpi.managerRating !== undefined) ? kpi.managerRating : 0;
+          initialSelfRatings[kpi.kpiId] = (kpi.selfRating !== null && kpi.selfRating !== undefined) ? kpi.selfRating : 0;
           initialEmpComments[kpi.kpiId] = kpi.employeeComments || kpi.comments || '';
           initialMgrComments[kpi.kpiId] = kpi.managerComments || '';
           initialHrComments[kpi.kpiId] = kpi.hrComments || '';
@@ -234,33 +234,40 @@ export const HrPmsLifecyclePage: React.FC = () => {
   };
 
   // Filter state for PMS status
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING_SELF' | 'PENDING_MANAGER' | 'COMPLETED'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING_SELF' | 'PENDING_MANAGER' | 'PENDING_HR' | 'COMPLETED'>('ALL');
 
   // Helper status matchers
   const isPendingSelf = (st?: string) => {
     if (!st) return true;
-    return st.includes('SELF') || st.includes('DRAFT') || st === 'PENDING';
+    return st.includes('SELF') || st.includes('DRAFT') || st === 'PENDING' || st.includes('PMS_NOT_STARTED') || st.includes('PMS_STARTED');
   };
 
   const isPendingManager = (st?: string) => {
     if (!st) return false;
-    return st.includes('SUBMITTED') || st.includes('MANAGER');
+    return st === 'SELF_ASSESSMENT_SUBMITTED' || st === 'MANAGER_REVIEW_PENDING';
+  };
+
+  const isPendingHr = (st?: string) => {
+    if (!st) return false;
+    return st === 'MANAGER_REVIEW_SUBMITTED' || st.includes('HR_REVIEW') || st === 'RATING_AND_POINTS_CALCULATED' || st === 'FINAL_ANALYSIS';
   };
 
   const isCompletedState = (st?: string) => {
     if (!st) return false;
-    return st.includes('COMPLETED') || st.includes('FINAL') || st.includes('PUBLISHED');
+    return st === 'FINAL_RESULT_PUBLISHED' || st === 'COMPLETED' || st.includes('COMPLETED') || st.includes('PUBLISHED');
   };
 
   const safeResults = Array.isArray(employeeResults) ? employeeResults : [];
   const pendingSelfCount = safeResults.filter(e => e && isPendingSelf(e.status)).length;
   const pendingManagerCount = safeResults.filter(e => e && isPendingManager(e.status)).length;
+  const pendingHrCount = safeResults.filter(e => e && isPendingHr(e.status)).length;
   const completedCount = safeResults.filter(e => e && isCompletedState(e.status)).length;
 
   const filteredEmployees = safeResults.filter(emp => {
     if (!emp) return false;
     if (statusFilter === 'PENDING_SELF') return isPendingSelf(emp.status);
     if (statusFilter === 'PENDING_MANAGER') return isPendingManager(emp.status);
+    if (statusFilter === 'PENDING_HR') return isPendingHr(emp.status);
     if (statusFilter === 'COMPLETED') return isCompletedState(emp.status);
     return true;
   });
@@ -268,6 +275,9 @@ export const HrPmsLifecyclePage: React.FC = () => {
   const renderPmsStatusBadge = (status?: string) => {
     if (isCompletedState(status)) {
       return <span className="px-2 py-0.5 rounded-md text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">Completed</span>;
+    }
+    if (isPendingHr(status)) {
+      return <span className="px-2 py-0.5 rounded-md text-[9px] font-extrabold bg-purple-100 text-purple-800 border border-purple-200">Pending HR Review</span>;
     }
     if (isPendingManager(status)) {
       return <span className="px-2 py-0.5 rounded-md text-[9px] font-extrabold bg-blue-100 text-blue-800 border border-blue-200">Pending Manager</span>;
@@ -307,7 +317,7 @@ export const HrPmsLifecyclePage: React.FC = () => {
       </div>
 
       {/* Top Summary Stat Cards for PMS Lifecycle Stages */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         <div 
           onClick={() => setStatusFilter('ALL')}
           className={`p-4 rounded-2xl border transition-all cursor-pointer ${statusFilter === 'ALL' ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
@@ -316,7 +326,7 @@ export const HrPmsLifecyclePage: React.FC = () => {
             <span className="text-[10px] font-bold uppercase tracking-wider opacity-80">Total Registered</span>
             <Users size={16} />
           </div>
-          <div className="text-2xl font-extrabold mt-1">{employeeResults.length}</div>
+          <div className="text-2xl font-extrabold mt-1">{safeResults.length}</div>
           <span className="text-[10px] opacity-75 font-medium block mt-0.5">All employees in cycle</span>
         </div>
 
@@ -342,6 +352,18 @@ export const HrPmsLifecyclePage: React.FC = () => {
           </div>
           <div className="text-2xl font-extrabold mt-1">{pendingManagerCount}</div>
           <span className="text-[10px] opacity-80 font-medium block mt-0.5">Awaiting manager review</span>
+        </div>
+
+        <div 
+          onClick={() => setStatusFilter('PENDING_HR')}
+          className={`p-4 rounded-2xl border transition-all cursor-pointer ${statusFilter === 'PENDING_HR' ? 'bg-purple-700 text-white border-purple-700 shadow-md' : 'bg-purple-50/80 border-purple-200 text-purple-900 hover:bg-purple-100/70'}`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider opacity-90">Pending HR Review</span>
+            <CheckCircle2 size={16} className="text-purple-600" />
+          </div>
+          <div className="text-2xl font-extrabold mt-1">{pendingHrCount}</div>
+          <span className="text-[10px] opacity-80 font-medium block mt-0.5">Awaiting final HR sign-off</span>
         </div>
 
         <div 
@@ -403,25 +425,31 @@ export const HrPmsLifecyclePage: React.FC = () => {
             <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl overflow-x-auto">
               <button
                 onClick={() => setStatusFilter('ALL')}
-                className={`flex-1 py-1 px-2 text-[10px] font-bold rounded-lg transition-all ${statusFilter === 'ALL' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                className={`py-1 px-2 text-[10px] font-bold rounded-lg transition-all whitespace-nowrap ${statusFilter === 'ALL' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
               >
-                All ({employeeResults.length})
+                All ({safeResults.length})
               </button>
               <button
                 onClick={() => setStatusFilter('PENDING_SELF')}
-                className={`flex-1 py-1 px-2 text-[10px] font-bold rounded-lg transition-all ${statusFilter === 'PENDING_SELF' ? 'bg-amber-500 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                className={`py-1 px-2 text-[10px] font-bold rounded-lg transition-all whitespace-nowrap ${statusFilter === 'PENDING_SELF' ? 'bg-amber-500 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
               >
                 Self ({pendingSelfCount})
               </button>
               <button
                 onClick={() => setStatusFilter('PENDING_MANAGER')}
-                className={`flex-1 py-1 px-2 text-[10px] font-bold rounded-lg transition-all ${statusFilter === 'PENDING_MANAGER' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                className={`py-1 px-2 text-[10px] font-bold rounded-lg transition-all whitespace-nowrap ${statusFilter === 'PENDING_MANAGER' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
               >
                 Mgr ({pendingManagerCount})
               </button>
               <button
+                onClick={() => setStatusFilter('PENDING_HR')}
+                className={`py-1 px-2 text-[10px] font-bold rounded-lg transition-all whitespace-nowrap ${statusFilter === 'PENDING_HR' ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+              >
+                HR Review ({pendingHrCount})
+              </button>
+              <button
                 onClick={() => setStatusFilter('COMPLETED')}
-                className={`flex-1 py-1 px-2 text-[10px] font-bold rounded-lg transition-all ${statusFilter === 'COMPLETED' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                className={`py-1 px-2 text-[10px] font-bold rounded-lg transition-all whitespace-nowrap ${statusFilter === 'COMPLETED' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
               >
                 Done ({completedCount})
               </button>
@@ -483,7 +511,7 @@ export const HrPmsLifecyclePage: React.FC = () => {
           ) : (
             <>
               {/* Performance Rating Scale Reference */}
-              <RatingScaleLegend defaultExpanded={false} />
+              <RatingScaleLegend defaultExpanded={true} />
 
               {/* Employee Summary Card */}
               <div className="bg-white rounded-2xl border border-slate-200/70 p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -516,9 +544,15 @@ export const HrPmsLifecyclePage: React.FC = () => {
                   <span className={`inline-block px-3 py-1 rounded-full text-xs font-extrabold mt-1 ${
                     isCompleted
                       ? 'bg-pms-lightGreen text-pms-darkGreen border border-pms-green/20'
+                      : isPendingHr(lifecycleData?.status)
+                      ? 'bg-purple-100 text-purple-900 border border-purple-300'
                       : 'bg-blue-50 text-blue-800 border border-blue-200'
                   }`}>
-                    {lifecycleData?.cycleMonth || 'August 2026'}: {lifecycleData?.status?.replace(/_/g, ' ') || 'ACTIVE'}
+                    {lifecycleData?.cycleMonth || 'August 2026'}: {
+                      lifecycleData?.status === 'MANAGER_REVIEW_SUBMITTED'
+                        ? 'MANAGER REVIEW SUBMITTED (AWAITING HR REVIEW)'
+                        : lifecycleData?.status?.replace(/_/g, ' ') || 'ACTIVE'
+                    }
                   </span>
                 </div>
               </div>
@@ -621,9 +655,9 @@ export const HrPmsLifecyclePage: React.FC = () => {
                             </div>
 
                             {/* Manager Rating Input */}
-                            <div className={`p-2.5 rounded-xl border text-center min-w-[110px] ${isHr25 ? 'bg-purple-50/80 border-purple-200' : 'bg-white border-slate-200'}`}>
-                              <label className={`text-[9px] font-bold uppercase tracking-wider block mb-1 ${isHr25 ? 'text-purple-900' : 'text-slate-400'}`}>
-                                {isHr25 ? 'HR 25% Rating' : 'Manager Rating'}
+                            <div className="p-2.5 rounded-xl border border-slate-200 bg-white text-center min-w-[110px]">
+                              <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                                Manager Rating
                               </label>
                               <input
                                 type="number"
@@ -647,8 +681,15 @@ export const HrPmsLifecyclePage: React.FC = () => {
                                 step="0.1"
                                 min="0"
                                 max="5"
-                                value={hrRatings[kpi.kpiId] !== undefined ? hrRatings[kpi.kpiId] : (kpi.hrRating ?? '')}
-                                onChange={(e) => setHrRatings(prev => ({ ...prev, [kpi.kpiId]: Math.min(5, Math.max(0, parseFloat(e.target.value) || 0)) }))}
+                                value={hrRatings[kpi.kpiId] !== undefined ? hrRatings[kpi.kpiId] : (kpi.hrRating ?? 0)}
+                                onChange={(e) => {
+                                  const val = Math.min(5, Math.max(0, parseFloat(e.target.value) || 0));
+                                  setHrRatings(prev => {
+                                    const next = { ...prev, [kpi.kpiId]: val };
+                                    recalculateHrScore(lifecycleData?.kpis || [], next);
+                                    return next;
+                                  });
+                                }}
                                 placeholder="0.0"
                                 className="w-16 px-2 py-1 text-center font-extrabold text-xs border rounded-lg border-blue-300 text-blue-800 bg-blue-50/50 focus:bg-white"
                               />

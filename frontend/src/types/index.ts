@@ -228,7 +228,7 @@ export interface HrReportSummary {
 
 export interface CreateEmployeePayload {
   name: string;
-  employeeCode?: string;
+  employeeCode: string;
   email: string;
   password: string;
   designation: string;

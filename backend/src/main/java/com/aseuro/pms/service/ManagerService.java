@@ -327,10 +327,7 @@ public class ManagerService {
 
         // Validate all ratings between 0.0 and 5.0
         for (ManagerReviewRequest.ManagerKpiRatingEntry entry : request.getRatings()) {
-            if (entry.getManagerRating() == null) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "Rating is required for KPI ID " + entry.getKpiId());
-            }
-            if (entry.getManagerRating() < 0.0 || entry.getManagerRating() > 5.0) {
+            if (entry.getManagerRating() != null && (entry.getManagerRating() < 0.0 || entry.getManagerRating() > 5.0)) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "Rating must be between 0.0 and 5.0 for KPI ID " + entry.getKpiId());
             }
         }
@@ -351,9 +348,11 @@ public class ManagerService {
                             .kpi(matchedKpi)
                             .build());
 
-            rating.setManagerRating(entry.getManagerRating());
+            if (entry.getManagerRating() != null) {
+                rating.setManagerRating(entry.getManagerRating());
+            }
             if (entry.getManagerComments() != null) {
-                rating.setManagerComments(entry.getManagerComments());
+                rating.setManagerComments(entry.getManagerComments().trim());
             }
             rating.setStatus("MANAGER_REVIEWED");
             employeeKpiRatingRepository.save(rating);

@@ -58,12 +58,12 @@ export const HrDashboardPage: React.FC = () => {
       color: 'border-blue-200 bg-blue-50/40'
     },
     {
-      id: 'managers',
-      title: '3. Add/Edit Managers',
-      description: 'Create manager accounts, update team leadership structures, and maintain organizational hierarchy.',
-      icon: <UserCheck className="text-purple-600" size={28} />,
-      link: '/hr/managers',
-      badge: 'Team Leads',
+      id: 'directory',
+      title: '3. Staff Directory & Promotions',
+      description: 'View corporate staff directory, promote employees to Team Reporting Managers or HR, and manage profiles.',
+      icon: <Users className="text-purple-600" size={28} />,
+      link: '/hr/employees',
+      badge: 'Staff & Leads',
       color: 'border-purple-200 bg-purple-50/40'
     },
     {
@@ -161,7 +161,7 @@ export const HrDashboardPage: React.FC = () => {
 
         {/* Total Managers */}
         <div
-          onClick={() => navigate('/hr/managers')}
+          onClick={() => navigate('/hr/employees?role=MANAGER')}
           className="bg-white p-6 rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-md transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between">

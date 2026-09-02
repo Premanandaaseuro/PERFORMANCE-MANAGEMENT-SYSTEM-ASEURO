@@ -40,6 +40,11 @@ export const HistoryDetail: React.FC = () => {
       .then((res) => {
         setAssignment(res);
         setLoading(false);
+        if (res.employee?.id) {
+          pmsApi.getHistory(res.employee.id)
+            .then(list => setHistoryList(list))
+            .catch(err => console.error(err));
+        }
       })
       .catch((err) => {
         console.error(err);
@@ -52,9 +57,6 @@ export const HistoryDetail: React.FC = () => {
     if (id) {
       loadAssignment(Number(id));
     }
-    pmsApi.getHistory()
-      .then(res => setHistoryList(res))
-      .catch(err => console.error(err));
   }, [id]);
 
   const handleDownload = async () => {
@@ -113,11 +115,17 @@ export const HistoryDetail: React.FC = () => {
       {/* Back button & Page Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <button
-          onClick={() => navigate('/reports')}
-          className="inline-flex items-center space-x-2 text-xs font-semibold text-slate-500 hover:text-pms-gray self-start"
+          onClick={() => {
+            if (window.history.length > 1) {
+              navigate(-1);
+            } else {
+              navigate('/reports');
+            }
+          }}
+          className="inline-flex items-center space-x-2 text-xs font-semibold text-slate-500 hover:text-pms-gray self-start cursor-pointer"
         >
           <ArrowLeft size={16} />
-          <span>Back to My Reports</span>
+          <span>Back to Reports</span>
         </button>
         
         <div className="flex flex-wrap items-center gap-3">

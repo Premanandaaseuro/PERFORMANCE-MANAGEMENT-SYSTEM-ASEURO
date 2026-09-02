@@ -107,17 +107,10 @@ export const ManagerKpiReviewPage: React.FC = () => {
   const handleSubmitReview = async () => {
     if (!reviewData) return;
 
-    // Validation: All manager ratings for non-HR KPIs must be between 0.0 and 5.0
+    // Validation: All manager ratings provided must be between 0.0 and 5.0
     for (const k of reviewData.kpis) {
-      if (isHrStandardKpiName(k.kpiName)) {
-        continue; // HR parameters are evaluated by HR, skip manager rating requirement
-      }
       const entry = managerRatings[k.kpiId];
-      if (typeof entry?.rating !== 'number') {
-        setError(`Please provide a manager rating for "${k.kpiName}".`);
-        return;
-      }
-      if (entry.rating < 0 || entry.rating > 5) {
+      if (typeof entry?.rating === 'number' && (entry.rating < 0 || entry.rating > 5)) {
         setError(`Rating must be between 0.0 and 5.0 for "${k.kpiName}".`);
         return;
       }
@@ -132,13 +125,15 @@ export const ManagerKpiReviewPage: React.FC = () => {
       setError(null);
 
       const payload = {
-        ratings: reviewData.kpis
-          .filter(k => typeof managerRatings[k.kpiId]?.rating === 'number')
-          .map(k => ({
+        ratings: reviewData.kpis.map(k => {
+          const entry = managerRatings[k.kpiId];
+          const ratingNum = typeof entry?.rating === 'number' ? entry.rating : (Number(entry?.rating) || 0);
+          return {
             kpiId: k.kpiId,
-            managerRating: managerRatings[k.kpiId].rating as number,
-            managerComments: managerRatings[k.kpiId].comments
-          })),
+            managerRating: ratingNum,
+            managerComments: entry?.comments || ''
+          };
+        }),
         managerComments: generalComments
       };
 
@@ -311,9 +306,9 @@ export const ManagerKpiReviewPage: React.FC = () => {
                         25% HR Parameter
                       </span>
                       <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-900 border border-purple-200 inline-block">
-                        {currentRating !== '' ? `${Number(currentRating).toFixed(1)} / 5.0` : 'Evaluated by HR'}
+                        Evaluated by HR
                       </span>
-                      <span className="text-[9px] text-purple-600 font-medium block">Standardized HR Rating KPI</span>
+                      <span className="text-[9px] text-purple-600 font-medium block">Rating handled exclusively by HR</span>
                     </div>
                   ) : (
                     <div className="bg-emerald-50/60 p-4 rounded-2xl border border-emerald-200 text-center space-y-2">

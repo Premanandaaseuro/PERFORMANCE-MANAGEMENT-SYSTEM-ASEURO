@@ -124,17 +124,89 @@ export const HrKpisPage: React.FC = () => {
   const hrRatingWeight = kpis.filter(k => isHrRatingKpiName(k.kpiName)).reduce((sum, k) => sum + k.weightage, 0);
   const customKpisWeight = kpis.filter(k => !isHrRatingKpiName(k.kpiName)).reduce((sum, k) => sum + k.weightage, 0);
 
+  const KPI_TEMPLATES: Record<'REGULAR' | 'HR', Array<{ name: string; description: string; suggestedWeight: number }>> = {
+    REGULAR: [
+      {
+        name: 'Sprint Task Delivery & Milestone Execution',
+        description: 'Deliver assigned sprint tasks, feature user stories, and bug fixes on schedule with minimal carry-over.',
+        suggestedWeight: 25
+      },
+      {
+        name: 'Code Quality, Test Coverage & PR Reviews',
+        description: 'Maintain clean modular code, adhere to coding standards, maintain test coverage, and conduct timely PR reviews.',
+        suggestedWeight: 20
+      },
+      {
+        name: 'System Stability, Bug Rate & Production SLA',
+        description: 'Ensure zero critical production defects, proactive monitoring, rapid incident response, and robust error handling.',
+        suggestedWeight: 15
+      },
+      {
+        name: 'Technical Architecture & Documentation',
+        description: 'Produce clear architectural design docs, maintain updated API specifications, and lead tech-sharing sessions.',
+        suggestedWeight: 15
+      }
+    ],
+    HR: [
+      {
+        name: 'Leave Pattern, Attendance & Punctuality',
+        description: 'Consistent attendance, adherence to core working hours, and pre-planned leave communication according to company policy.',
+        suggestedWeight: 10
+      },
+      {
+        name: 'Team Collaboration, Mentorship & Core Values',
+        description: 'Active cross-functional teamwork, constructive feedback, mentoring junior colleagues, and upholding company culture.',
+        suggestedWeight: 10
+      },
+      {
+        name: 'Initiative, Continuous Learning & Certifications',
+        description: 'Proactively identifying operational improvements, undertaking relevant domain certifications, and driving internal initiatives.',
+        suggestedWeight: 5
+      }
+    ]
+  };
+
   const openCreateModal = () => {
     setModalMode('create');
     setCurrentKpiId(null);
     setFormKpiName('');
     setFormDescription('');
-    setFormWeightage(25);
+    
+    // Auto-calculate smart remaining weightage
+    const remainingNonHr = Math.max(0, Math.round((75.0 - customKpisWeight) * 10) / 10);
+    const remainingHr = Math.max(0, Math.round((25.0 - hrRatingWeight) * 10) / 10);
+    
+    const cat = remainingNonHr > 0 ? 'REGULAR' : 'HR';
+    setFormKpiCategory(cat);
+    const autoWeight = cat === 'REGULAR' 
+      ? (remainingNonHr > 0 ? Math.min(25, remainingNonHr) : 10)
+      : (remainingHr > 0 ? Math.min(10, remainingHr) : 5);
+    setFormWeightage(autoWeight);
     setFormSelfRatingScale('1.0 - 5.0 Rating Scale');
     setFormManagerRatingScale('1.0 - 5.0 Rating Scale');
-    setFormKpiCategory('REGULAR');
     setFormError(null);
     setModalOpen(true);
+  };
+
+  const handleCategoryChange = (cat: 'REGULAR' | 'HR') => {
+    setFormKpiCategory(cat);
+    setFormError(null);
+    const remaining = cat === 'REGULAR'
+      ? Math.max(0, Math.round((75.0 - customKpisWeight) * 10) / 10)
+      : Math.max(0, Math.round((25.0 - hrRatingWeight) * 10) / 10);
+    if (remaining > 0) {
+      setFormWeightage(Math.min(cat === 'REGULAR' ? 25 : 10, remaining));
+    }
+  };
+
+  const applyTemplate = (tpl: { name: string; description: string; suggestedWeight: number }) => {
+    setFormKpiName(tpl.name);
+    setFormDescription(tpl.description);
+    const remaining = formKpiCategory === 'REGULAR'
+      ? Math.max(0, Math.round((75.0 - customKpisWeight) * 10) / 10)
+      : Math.max(0, Math.round((25.0 - hrRatingWeight) * 10) / 10);
+    setFormWeightage(remaining > 0 ? Math.min(tpl.suggestedWeight, remaining) : tpl.suggestedWeight);
+    setFormError(null);
   };
 
   const openEditModal = (kpi: KpiMasterItem) => {
@@ -150,7 +222,7 @@ export const HrKpisPage: React.FC = () => {
     setModalOpen(true);
   };
 
-  const handleSaveKpi = async (e: React.FormEvent) => {
+  const handleSaveKpi = async (e: React.FormEvent, addAnother = false) => {
     e.preventDefault();
     setFormError(null);
     setError(null);
@@ -180,12 +252,14 @@ export const HrKpisPage: React.FC = () => {
     const otherHrWeight = hrKpis.reduce((sum, k) => sum + k.weightage, 0);
 
     if (!isHrParam && (otherNonHrWeight + formWeightage > 75.0)) {
-      setFormError(`Total Non-HR KPI weightage cannot exceed 75%! (Currently allocated non-HR: ${otherNonHrWeight.toFixed(1)}%, Maximum remaining available for Non-HR KPIs: ${(75.0 - otherNonHrWeight).toFixed(1)}%). Switch KPI Category to "HR Parameter KPI" if adding an HR KPI.`);
+      const avail = Math.max(0, 75.0 - otherNonHrWeight);
+      setFormError(`Non-HR KPI weightage cannot exceed 75%! (Allocated: ${otherNonHrWeight.toFixed(1)}%, Available: ${avail.toFixed(1)}%). Consider setting weightage to ${avail.toFixed(1)}% or switch to "HR Parameter KPI".`);
       return;
     }
 
     if (isHrParam && (otherHrWeight + formWeightage > 25.0)) {
-      setFormError(`Total HR Parameter weightage cannot exceed 25%! (Currently allocated HR Parameters: ${otherHrWeight.toFixed(1)}%, Maximum remaining available for HR Parameters: ${(25.0 - otherHrWeight).toFixed(1)}%).`);
+      const avail = Math.max(0, 25.0 - otherHrWeight);
+      setFormError(`HR Parameter weightage cannot exceed 25%! (Allocated: ${otherHrWeight.toFixed(1)}%, Available: ${avail.toFixed(1)}%). Consider setting weightage to ${avail.toFixed(1)}%.`);
       return;
     }
 
@@ -221,8 +295,26 @@ export const HrKpisPage: React.FC = () => {
         setSuccess(`KPI "${finalKpiName}" updated successfully.`);
       }
 
-      setModalOpen(false);
       loadKpis(selectedDesignation);
+
+      if (addAnother && modalMode === 'create') {
+        // Prepare next KPI creation seamlessly
+        setFormKpiName('');
+        setFormDescription('');
+        const updatedNonHr = isHrParam ? customKpisWeight : customKpisWeight + formWeightage;
+        const updatedHr = isHrParam ? hrRatingWeight + formWeightage : hrRatingWeight;
+        const nextRemNonHr = Math.max(0, Math.round((75.0 - updatedNonHr) * 10) / 10);
+        const nextRemHr = Math.max(0, Math.round((25.0 - updatedHr) * 10) / 10);
+
+        const nextCat = nextRemNonHr > 0 ? 'REGULAR' : 'HR';
+        setFormKpiCategory(nextCat);
+        const nextAuto = nextCat === 'REGULAR'
+          ? (nextRemNonHr > 0 ? Math.min(25, nextRemNonHr) : 10)
+          : (nextRemHr > 0 ? Math.min(10, nextRemHr) : 5);
+        setFormWeightage(nextAuto);
+      } else {
+        setModalOpen(false);
+      }
       setTimeout(() => setSuccess(null), 4000);
     } catch (err: any) {
       console.error(err);
@@ -492,7 +584,23 @@ export const HrKpisPage: React.FC = () => {
               </div>
             )}
 
-            <form onSubmit={handleSaveKpi} className="space-y-4">
+            {/* Live Budget Breakdown */}
+            <div className="flex flex-col sm:flex-row items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs gap-2">
+              <div className="flex items-center space-x-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block" />
+                <span className="font-semibold text-slate-700">Manager Evaluated:</span>
+                <span className="font-extrabold text-emerald-900">{customKpisWeight}% / 75%</span>
+                <span className="text-[10px] text-slate-500 font-bold">({Math.max(0, Math.round((75 - customKpisWeight) * 10) / 10)}% left)</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-purple-600 inline-block" />
+                <span className="font-semibold text-slate-700">HR Evaluated:</span>
+                <span className="font-extrabold text-purple-900">{hrRatingWeight}% / 25%</span>
+                <span className="text-[10px] text-slate-500 font-bold">({Math.max(0, Math.round((25 - hrRatingWeight) * 10) / 10)}% left)</span>
+              </div>
+            </div>
+
+            <form onSubmit={(e) => handleSaveKpi(e, false)} className="space-y-4">
               {/* Field 0: KPI Category / Evaluator Type */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
@@ -511,7 +619,7 @@ export const HrKpisPage: React.FC = () => {
                       name="kpiCategory"
                       value="REGULAR"
                       checked={formKpiCategory === 'REGULAR'}
-                      onChange={() => setFormKpiCategory('REGULAR')}
+                      onChange={() => handleCategoryChange('REGULAR')}
                       className="accent-emerald-600"
                     />
                     <div className="text-xs">
@@ -532,7 +640,7 @@ export const HrKpisPage: React.FC = () => {
                       name="kpiCategory"
                       value="HR"
                       checked={formKpiCategory === 'HR'}
-                      onChange={() => setFormKpiCategory('HR')}
+                      onChange={() => handleCategoryChange('HR')}
                       className="accent-purple-600"
                     />
                     <div className="text-xs">
@@ -542,6 +650,31 @@ export const HrKpisPage: React.FC = () => {
                   </label>
                 </div>
               </div>
+
+              {/* Quick KPI Templates / Suggestions */}
+              {modalMode === 'create' && (
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider flex items-center space-x-1">
+                      <span>⚡ Quick 1-Click Templates & Pre-fills:</span>
+                    </span>
+                    <span className="text-[10px] text-emerald-700 font-semibold">Click chip to auto-fill</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {KPI_TEMPLATES[formKpiCategory].map((tpl, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => applyTemplate(tpl)}
+                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-emerald-50 hover:text-emerald-900 hover:border-emerald-300 border border-slate-200 text-[11px] font-bold text-slate-700 shadow-2xs transition-all text-left truncate max-w-xs"
+                        title={tpl.description}
+                      >
+                        + {tpl.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Field 1: KPI Name */}
               <div>
@@ -575,9 +708,14 @@ export const HrKpisPage: React.FC = () => {
 
               {/* Field 3: Measurement Weightage (%) */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  3. Measurement Weightage Percentage (1% - 75% for Non-HR KPIs) *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    3. Measurement Weightage Percentage *
+                  </label>
+                  <span className="text-[11px] font-bold text-emerald-800">
+                    Max Available for this category: {formKpiCategory === 'REGULAR' ? Math.max(0, Math.round((75 - customKpisWeight) * 10) / 10) : Math.max(0, Math.round((25 - hrRatingWeight) * 10) / 10)}%
+                  </span>
+                </div>
                 <div className="relative rounded-xl shadow-xs">
                   <input
                     type="number"
@@ -593,12 +731,40 @@ export const HrKpisPage: React.FC = () => {
                     %
                   </div>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1.5 font-medium">
-                  💡 <strong>Flexible Weightage:</strong> Enter any exact integer or decimal percentage (e.g. 75.6%, 12.5%, 10%). Any KPI can be added, edited, or deleted freely (Total $\le$ 100%).
-                </p>
+
+                {/* Quick Weightage Presets */}
+                <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Quick Select:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const rem = formKpiCategory === 'REGULAR' 
+                        ? Math.max(0, Math.round((75 - customKpisWeight) * 10) / 10) 
+                        : Math.max(0, Math.round((25 - hrRatingWeight) * 10) / 10);
+                      if (rem > 0) setFormWeightage(rem);
+                    }}
+                    className="px-2 py-0.5 rounded-md bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 text-[10px] font-extrabold transition-all"
+                  >
+                    Fill Remaining ({formKpiCategory === 'REGULAR' ? Math.max(0, Math.round((75 - customKpisWeight) * 10) / 10) : Math.max(0, Math.round((25 - hrRatingWeight) * 10) / 10)}%)
+                  </button>
+                  {[5, 10, 15, 20, 25].map(w => (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => setFormWeightage(w)}
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all ${
+                        formWeightage === w
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      {w}%
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-100 flex justify-end space-x-3">
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
@@ -606,14 +772,27 @@ export const HrKpisPage: React.FC = () => {
                 >
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-5 py-2.5 bg-pms-green hover:bg-pms-darkGreen text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition-all disabled:opacity-50 flex items-center space-x-1.5"
-                >
-                  <Save size={15} />
-                  <span>{saving ? 'Saving KPI...' : 'Save KPI'}</span>
-                </button>
+
+                <div className="flex items-center space-x-2">
+                  {modalMode === 'create' && (
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={(e) => handleSaveKpi(e, true)}
+                      className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl border border-slate-300 transition-all disabled:opacity-50 flex items-center space-x-1.5"
+                    >
+                      <span>Save & Add Another</span>
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="px-5 py-2.5 bg-pms-green hover:bg-pms-darkGreen text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition-all disabled:opacity-50 flex items-center space-x-1.5"
+                  >
+                    <Save size={15} />
+                    <span>{saving ? 'Saving KPI...' : 'Save KPI'}</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>

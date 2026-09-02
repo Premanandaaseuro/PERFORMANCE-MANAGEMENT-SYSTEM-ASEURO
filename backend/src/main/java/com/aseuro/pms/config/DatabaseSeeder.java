@@ -50,9 +50,10 @@ public class DatabaseSeeder implements CommandLineRunner {
         seedKpiMasterData();
 
         if (employeeRepository.count() > 0) {
-            // Ensure HR user exists with correct password Hr@12345
+            // Ensure HR user exists with correct password Hr@12345 and name HR
             employeeRepository.findByEmail("hr@aseuro.com").ifPresent(hr -> {
                 hr.setPassword(passwordEncoder.encode("Hr@12345"));
+                hr.setName("HR");
                 hr.setRole(Role.ROLE_HR);
                 employeeRepository.save(hr);
             });
@@ -77,7 +78,7 @@ public class DatabaseSeeder implements CommandLineRunner {
         Employee hr = Employee.builder()
                 .email("hr@aseuro.com")
                 .password(passwordEncoder.encode("Hr@12345"))
-                .name("Bob HR")
+                .name("HR")
                 .department("Human Resources")
                 .designation("HR Director")
                 .joiningDate(LocalDate.of(2022, 1, 15))

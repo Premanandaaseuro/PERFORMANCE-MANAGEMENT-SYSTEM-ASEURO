@@ -65,16 +65,17 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
     { name: 'View My KPIs', href: '/manager/my-kpis', icon: <Target size={20} /> },
     { name: 'View New Employees Assigned', href: '/manager/employees', icon: <Users size={20} /> },
     { name: 'Reports', href: '/manager/reports', icon: <FileText size={20} /> },
+    { name: 'View Profile', href: '/profile', icon: <User size={20} /> },
   ];
 
   const hrNavigation = [
     { name: 'Dashboard', href: '/hr/dashboard', icon: <LayoutDashboard size={20} /> },
     { name: 'Add Employee', href: '/hr/employees/add', icon: <UserPlus size={20} /> },
     { name: 'Employee Directory', href: '/hr/employees', icon: <Users size={20} /> },
-    { name: 'Add/Edit Managers', href: '/hr/managers', icon: <UserCheck size={20} /> },
     { name: 'Add/Edit KPIs', href: '/hr/kpis', icon: <Target size={20} /> },
     { name: 'PMS Lifecycle', href: '/hr/pms-lifecycle', icon: <RefreshCw size={20} /> },
     { name: 'Generate Reports', href: '/hr/reports', icon: <FileText size={20} /> },
+    { name: 'View Profile', href: '/profile', icon: <User size={20} /> },
   ];
 
   const navigation = isHr ? hrNavigation : isManager ? managerNavigation : employeeNavigation;
@@ -243,7 +244,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
           </div>
           <div className="flex items-center space-x-4">
             <div className="flex flex-col text-right">
-              <span className="text-sm font-bold text-pms-gray">{user?.name || (isHr ? 'Bob HR' : isManager ? 'Alice Smith' : 'User')}</span>
+              <span className="text-sm font-bold text-pms-gray">{user?.name || (isHr ? 'HR' : isManager ? 'Alice Smith' : 'User')}</span>
               <span className="text-xs text-slate-400 capitalize font-medium">{isHr ? 'HR Administrator' : isManager ? 'Reporting Manager' : 'Employee'}</span>
             </div>
             {user?.profilePhoto ? (

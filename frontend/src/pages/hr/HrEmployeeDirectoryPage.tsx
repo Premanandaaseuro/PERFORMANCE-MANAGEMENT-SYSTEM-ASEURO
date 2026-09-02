@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { hrApi } from '../../api/hrApi';
-import { EmployeeRecord, ManagerOption } from '../../types';
+import { EmployeeRecord, ManagerOption, Designation } from '../../types';
 import {
   Users,
   UserPlus,
@@ -20,12 +20,15 @@ export const HrEmployeeDirectoryPage: React.FC = () => {
   const navigate = useNavigate();
   const [employees, setEmployees] = useState<EmployeeRecord[]>([]);
   const [managers, setManagers] = useState<ManagerOption[]>([]);
+  const [designations, setDesignations] = useState<Designation[]>([]);
+  const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
 
   // Edit Modal State
   const [editingEmp, setEditingEmp] = useState<EmployeeRecord | null>(null);
+  const [editEmployeeCode, setEditEmployeeCode] = useState('');
   const [editName, setEditName] = useState('');
   const [editRole, setEditRole] = useState('EMPLOYEE');
   const [editDesignation, setEditDesignation] = useState('');
@@ -40,10 +43,17 @@ export const HrEmployeeDirectoryPage: React.FC = () => {
 
   const fetchEmployeesAndManagers = () => {
     setLoading(true);
-    Promise.all([hrApi.getEmployees(), hrApi.getManagers()])
-      .then(([empData, mgrData]) => {
+    Promise.all([
+      hrApi.getEmployees(),
+      hrApi.getManagers(),
+      hrApi.getDesignations(),
+      hrApi.getDepartments()
+    ])
+      .then(([empData, mgrData, desigData, deptData]) => {
         setEmployees(empData);
         setManagers(mgrData);
+        setDesignations(desigData);
+        setDepartments(deptData);
         setLoading(false);
       })
       .catch((err) => {
@@ -58,6 +68,7 @@ export const HrEmployeeDirectoryPage: React.FC = () => {
 
   const openEditModal = (emp: EmployeeRecord) => {
     setEditingEmp(emp);
+    setEditEmployeeCode(emp.employeeCode || `EMP-${emp.id}`);
     setEditName(emp.name || emp.fullName || '');
     setEditRole((emp.role || 'EMPLOYEE').replace('ROLE_', ''));
     setEditDesignation(emp.designation || emp.designationName || 'Software Engineer');
@@ -77,7 +88,11 @@ export const HrEmployeeDirectoryPage: React.FC = () => {
 
     setSaving(true);
     try {
+      const previousRole = (editingEmp.role || 'EMPLOYEE').replace('ROLE_', '');
+      const isRolePromoted = previousRole !== editRole;
+
       await hrApi.updateEmployee(editingEmp.id, {
+        employeeCode: editEmployeeCode.trim().toUpperCase(),
         name: editName,
         role: editRole,
         designation: editDesignation,
@@ -87,8 +102,14 @@ export const HrEmployeeDirectoryPage: React.FC = () => {
         accountStatus: editAccountStatus
       });
 
-      setToastMessage(`Updated ${editName} successfully!`);
-      setTimeout(() => setToastMessage(null), 3000);
+      if (isRolePromoted && editRole === 'MANAGER') {
+        setToastMessage(`Promoted "${editName}" to Manager! They are now available as a Reporting Manager.`);
+      } else if (isRolePromoted && editRole === 'HR') {
+        setToastMessage(`Promoted "${editName}" to HR Administrator!`);
+      } else {
+        setToastMessage(`Updated "${editName}" successfully!`);
+      }
+      setTimeout(() => setToastMessage(null), 4000);
       closeEditModal();
       fetchEmployeesAndManagers();
     } catch (err: any) {
@@ -320,6 +341,22 @@ export const HrEmployeeDirectoryPage: React.FC = () => {
             </div>
 
             <form onSubmit={handleSaveEdit} className="space-y-4">
+              {/* Employee ID / Code */}
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1 flex items-center justify-between">
+                  <span>Employee ID / Code *</span>
+                  <span className="text-[10px] text-emerald-700 font-semibold lowercase">Official HR Record</span>
+                </label>
+                <input
+                  type="text"
+                  value={editEmployeeCode}
+                  onChange={(e) => setEditEmployeeCode(e.target.value.toUpperCase())}
+                  required
+                  placeholder="e.g. EMP-105"
+                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-extrabold text-pms-gray focus:ring-2 focus:ring-pms-green/50 uppercase"
+                />
+              </div>
+
               {/* Employee Name */}
               <div>
                 <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
@@ -353,39 +390,26 @@ export const HrEmployeeDirectoryPage: React.FC = () => {
                 </span>
               </div>
 
-              {/* Designation Selection */}
-              <div>
-                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
-                  Job Designation:
-                </label>
-                <select
-                  value={editDesignation}
-                  onChange={(e) => setEditDesignation(e.target.value)}
-                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-bold text-pms-gray focus:ring-2 focus:ring-pms-green/50"
-                >
-                  <option value="Software Engineer">Software Engineer</option>
-                  <option value="Senior Software Engineer">Senior Software Engineer</option>
-                  <option value="Tech Lead">Tech Lead</option>
-                  <option value="Engineering Manager">Engineering Manager</option>
-                  <option value="QA Engineer">QA Engineer</option>
-                  <option value="Senior QA Engineer">Senior QA Engineer</option>
-                  <option value="DevOps Lead">DevOps Lead</option>
-                  <option value="HR Specialist">HR Specialist</option>
-                </select>
-              </div>
-
-              {/* Department & Team */}
+              {/* Department & Team (placed directly below Corporate System Role to match design) */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
                     Department:
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={editDepartment}
                     onChange={(e) => setEditDepartment(e.target.value)}
                     className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-bold text-pms-gray focus:ring-2 focus:ring-pms-green/50"
-                  />
+                  >
+                    {editDepartment && !departments.some(d => d.name.toLowerCase() === editDepartment.toLowerCase()) && (
+                      <option value={editDepartment}>{editDepartment}</option>
+                    )}
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.name}>
+                        {dept.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
@@ -398,6 +422,27 @@ export const HrEmployeeDirectoryPage: React.FC = () => {
                     className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-bold text-pms-gray focus:ring-2 focus:ring-pms-green/50"
                   />
                 </div>
+              </div>
+
+              {/* Designation Selection (Dynamic DB list including newly added roles) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
+                  Job Designation:
+                </label>
+                <select
+                  value={editDesignation}
+                  onChange={(e) => setEditDesignation(e.target.value)}
+                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-bold text-pms-gray focus:ring-2 focus:ring-pms-green/50"
+                >
+                  {editDesignation && !designations.some(d => d.name.toLowerCase() === editDesignation.toLowerCase()) && (
+                    <option value={editDesignation}>{editDesignation}</option>
+                  )}
+                  {designations.map((d) => (
+                    <option key={d.id} value={d.name}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Reporting Manager */}

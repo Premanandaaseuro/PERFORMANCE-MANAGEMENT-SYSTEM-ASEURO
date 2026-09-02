@@ -37,6 +37,7 @@ public class HrManagementController {
     private final PmsKpiRepository pmsKpiRepository;
     private final KpiMasterRepository kpiMasterRepository;
     private final DesignationRepository designationRepository;
+    private final DepartmentRepository departmentRepository;
     private final PasswordEncoder passwordEncoder;
     private final HrKpiService hrKpiService;
     private final HrLifecycleService hrLifecycleService;
@@ -114,6 +115,63 @@ public class HrManagementController {
         ));
     }
 
+    // 2b. Department List
+    @GetMapping("/departments")
+    public ResponseEntity<List<Map<String, Object>>> getDepartments() {
+        Set<String> deptNames = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        // Standard company departments
+        deptNames.addAll(List.of("Engineering", "Human Resources", "Quality Assurance", "Product & Design", "Sales & Marketing", "Finance & Operations", "IT Support"));
+
+        // From Department entity table
+        departmentRepository.findAll().forEach(d -> {
+            if (d.getName() != null && !d.getName().isBlank()) {
+                deptNames.add(d.getName().trim());
+            }
+        });
+
+        // From employees
+        employeeRepository.findAll().forEach(e -> {
+            if (e.getDepartment() != null && !e.getDepartment().isBlank() && !"-".equals(e.getDepartment())) {
+                deptNames.add(e.getDepartment().trim());
+            }
+        });
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        long id = 1;
+        for (String d : deptNames) {
+            result.add(Map.of("id", id++, "name", d, "description", d + " Department"));
+        }
+        return ResponseEntity.ok(result);
+    }
+
+    // Create New Department
+    @PostMapping("/departments")
+    @Transactional
+    public ResponseEntity<Map<String, Object>> createDepartment(@RequestBody Map<String, String> request) {
+        String name = request.get("name");
+        if (name == null || name.trim().isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Department name is required.");
+        }
+        String deptName = name.trim();
+        String description = request.get("description") != null ? request.get("description").trim() : deptName + " Department";
+
+        Optional<com.aseuro.pms.entity.Department> existingOpt = departmentRepository.findByNameIgnoreCase(deptName);
+        com.aseuro.pms.entity.Department department;
+        if (existingOpt.isPresent()) {
+            department = existingOpt.get();
+        } else {
+            department = new com.aseuro.pms.entity.Department(deptName, description);
+            department = departmentRepository.save(department);
+        }
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                "id", department.getId(),
+                "name", department.getName(),
+                "description", department.getDescription() != null ? department.getDescription() : "",
+                "message", "Department created successfully."
+        ));
+    }
+
     // 3. Manager Options for Dropdown & List
     @GetMapping("/managers")
     public ResponseEntity<List<ManagerOptionDto>> getManagers() {
@@ -125,7 +183,7 @@ public class HrManagementController {
                 .map(m -> new ManagerOptionDto(
                         m.getId(),
                         m.getName(),
-                        "MGR-" + m.getId(),
+                        m.getEmployeeCode() != null && !m.getEmployeeCode().isBlank() ? m.getEmployeeCode() : "MGR-" + m.getId(),
                         m.getEmail(),
                         m.getDesignation() != null ? m.getDesignation() : "Engineering Manager",
                         m.getManager() != null ? m.getManager().getId() : null,
@@ -183,7 +241,7 @@ public class HrManagementController {
         List<EmployeeDto> dtoList = allEmployees.stream()
                 .map(e -> EmployeeDto.builder()
                         .id(e.getId())
-                        .employeeCode("EMP-" + e.getId())
+                        .employeeCode(e.getEmployeeCode() != null && !e.getEmployeeCode().isBlank() ? e.getEmployeeCode() : "EMP-" + e.getId())
                         .name(e.getName())
                         .email(e.getEmail())
                         .role(e.getRole() != null ? e.getRole().name().replace("ROLE_", "") : "EMPLOYEE")
@@ -211,8 +269,21 @@ public class HrManagementController {
         if (email.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Email address is required.");
         }
-        if (request.getPassword() == null || request.getPassword().trim().isEmpty()) {
+        String pwd = request.getPassword() != null ? request.getPassword().trim() : "";
+        if (pwd.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Password is required.");
+        }
+        if (pwd.length() < 8 || !pwd.matches(".*[a-zA-Z].*") || !pwd.matches(".*[0-9].*") || !pwd.matches(".*[^a-zA-Z0-9].*")) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Password must be at least 8 characters and contain alphabets, numbers, and special characters.");
+        }
+
+        String employeeCode = request.getEmployeeCode() != null ? request.getEmployeeCode().trim().toUpperCase() : "";
+        if (employeeCode.isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Employee ID / Code is mandatory as per HR records.");
+        }
+
+        if (employeeRepository.existsByEmployeeCodeIgnoreCase(employeeCode)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Employee Code '" + employeeCode + "' already exists in the system.");
         }
 
         if (employeeRepository.findByEmail(email).isPresent()) {
@@ -226,8 +297,15 @@ public class HrManagementController {
         }
 
         Role role = Role.ROLE_EMPLOYEE;
-        if (request.getRole() != null && (request.getRole().equalsIgnoreCase("MANAGER") || request.getRole().equalsIgnoreCase("ROLE_MANAGER"))) {
-            role = Role.ROLE_MANAGER;
+        if (request.getRole() != null) {
+            String roleStr = request.getRole().trim().toUpperCase();
+            if (roleStr.contains("MANAGER")) {
+                role = Role.ROLE_MANAGER;
+            } else if (roleStr.contains("HR")) {
+                role = Role.ROLE_HR;
+            } else {
+                role = Role.ROLE_EMPLOYEE;
+            }
         }
 
         String designation = request.getDesignation();
@@ -241,6 +319,7 @@ public class HrManagementController {
         }
 
         Employee employee = Employee.builder()
+                .employeeCode(employeeCode)
                 .name(name)
                 .email(email)
                 .password(passwordEncoder.encode(request.getPassword()))
@@ -287,11 +366,12 @@ public class HrManagementController {
         }
 
         // Send welcome email with login credentials
-        emailService.sendWelcomeEmail(saved.getEmail(), saved.getName(), request.getPassword(), saved.getRole() == Role.ROLE_MANAGER ? "Manager" : "Employee", "EMP-" + saved.getId());
+        emailService.sendWelcomeEmail(saved.getEmail(), saved.getName(), request.getPassword(), saved.getRole() == Role.ROLE_MANAGER ? "Manager" : "Employee", saved.getEmployeeCode());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                 "message", "Employee created and KPIs assigned successfully. Welcome email with login details has been sent.",
                 "id", saved.getId(),
+                "employeeCode", saved.getEmployeeCode(),
                 "name", saved.getName(),
                 "email", saved.getEmail(),
                 "designation", saved.getDesignation(),
@@ -306,6 +386,13 @@ public class HrManagementController {
         Employee employee = employeeRepository.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Employee not found."));
 
+        if (request.getEmployeeCode() != null && !request.getEmployeeCode().trim().isEmpty()) {
+            String newCode = request.getEmployeeCode().trim().toUpperCase();
+            if (!newCode.equalsIgnoreCase(employee.getEmployeeCode()) && employeeRepository.existsByEmployeeCodeIgnoreCase(newCode)) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Employee Code '" + newCode + "' is already assigned to another employee.");
+            }
+            employee.setEmployeeCode(newCode);
+        }
         if (request.getEffectiveName() != null) {
             employee.setName(request.getEffectiveName());
         }
@@ -346,6 +433,7 @@ public class HrManagementController {
         return ResponseEntity.ok(Map.of(
                 "message", "Employee updated successfully.",
                 "id", saved.getId(),
+                "employeeCode", saved.getEmployeeCode() != null ? saved.getEmployeeCode() : "EMP-" + saved.getId(),
                 "name", saved.getName(),
                 "role", saved.getRole().name().replace("ROLE_", ""),
                 "designation", saved.getDesignation() != null ? saved.getDesignation() : "-",

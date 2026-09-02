@@ -30,7 +30,6 @@ export const ManagerReportsPage: React.FC = () => {
 
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('ALL');
   const [selectedMonth, setSelectedMonth] = useState<string>('ALL');
-  const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Manager's own personal appraisal history state
@@ -93,11 +92,6 @@ export const ManagerReportsPage: React.FC = () => {
   const filteredEmployees = (reportsData?.assignedEmployees || []).filter((emp: ManagerEmployeeItem) => {
     if (selectedEmployeeId !== 'ALL' && emp.id.toString() !== selectedEmployeeId) return false;
     if (selectedMonth !== 'ALL' && emp.cycleMonth !== selectedMonth) return false;
-    if (selectedStatus !== 'ALL') {
-      if (selectedStatus === 'FINALIZED' && emp.status !== 'COMPLETED' && emp.status !== 'FINAL_RESULT_PUBLISHED') return false;
-      if (selectedStatus === 'PENDING_MGR' && emp.status !== 'SELF_ASSESSMENT_SUBMITTED' && emp.status !== 'MANAGER_REVIEW_PENDING') return false;
-      if (selectedStatus === 'REVIEWED_MGR' && emp.status !== 'MANAGER_REVIEW_SUBMITTED' && emp.status !== 'HR_REVIEW_PENDING') return false;
-    }
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return (
@@ -387,15 +381,24 @@ export const ManagerReportsPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Action Buttons: View Only */}
+                    {/* Action Buttons: View and Download PDF */}
                     <div className="pt-3 border-t border-slate-100 flex items-center justify-end space-x-3">
                       <button
                         onClick={() => navigate(`/history/${h.assignmentId || h.id}`)}
-                        className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 hover:text-pms-gray rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1.5 shadow-sm"
+                        className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 hover:text-pms-gray rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1.5 shadow-xs"
                         title="View online report details"
                       >
                         <Eye size={15} />
                         <span>View</span>
+                      </button>
+                      <button
+                        onClick={() => handleDownload(h.assignmentId || h.id, 'pdf', 'My_Appraisal')}
+                        disabled={downloading === (h.assignmentId || h.id)}
+                        className="px-4 py-2 bg-pms-green hover:bg-pms-darkGreen text-white rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1.5 shadow-xs disabled:opacity-50"
+                        title="Download PDF report"
+                      >
+                        <Download size={15} />
+                        <span>Download PDF</span>
                       </button>
                     </div>
                   </div>
@@ -449,7 +452,7 @@ export const ManagerReportsPage: React.FC = () => {
           <span>Report Filters</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Employee Filter */}
           <div>
             <label className="text-xs font-bold text-slate-500 uppercase block mb-1.5">Filter by Employee</label>
@@ -477,21 +480,6 @@ export const ManagerReportsPage: React.FC = () => {
               {uniqueMonths.map((m: string) => (
                 <option key={m} value={m}>{m}</option>
               ))}
-            </select>
-          </div>
-
-          {/* Status Filter */}
-          <div>
-            <label className="text-xs font-bold text-slate-500 uppercase block mb-1.5">Appraisal Status</label>
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-pms-green focus:bg-white"
-            >
-              <option value="ALL">All Statuses</option>
-              <option value="FINALIZED">Finalized / Published</option>
-              <option value="PENDING_MGR">Awaiting Manager Review</option>
-              <option value="REVIEWED_MGR">Manager Reviewed / In HR</option>
             </select>
           </div>
 
@@ -523,7 +511,7 @@ export const ManagerReportsPage: React.FC = () => {
                 <th className="py-4 px-6">Cycle</th>
                 <th className="py-4 px-6">Status</th>
                 <th className="py-4 px-6 text-center">Score & Grade</th>
-                <th className="py-4 px-6 text-right">Download Report</th>
+                <th className="py-4 px-6 text-right">Report Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
@@ -548,7 +536,9 @@ export const ManagerReportsPage: React.FC = () => {
                         {emp.designation}
                       </td>
                       <td className="py-4 px-6 text-slate-600 font-medium">
-                        {emp.cycleMonth || 'August 2026'}
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                          {emp.cycleMonth || 'August 2026'}
+                        </span>
                       </td>
                       <td className="py-4 px-6">
                         <span className={`inline-flex items-center space-x-1 px-3 py-1 rounded-full text-xs font-bold ${
@@ -580,24 +570,23 @@ export const ManagerReportsPage: React.FC = () => {
                       </td>
                       <td className="py-4 px-6 text-right">
                         {emp.assignmentId ? (
-                          <div className="inline-flex items-center gap-2">
+                          <div className="inline-flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => navigate(`/history/${emp.assignmentId}`)}
+                              className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-700 hover:text-pms-gray rounded-lg text-xs font-semibold transition-colors shadow-xs"
+                              title="View online report details"
+                            >
+                              <Eye size={14} />
+                              <span>View</span>
+                            </button>
                             <button
                               onClick={() => handleDownload(emp.assignmentId!, 'pdf', emp.name)}
                               disabled={downloading === emp.assignmentId}
-                              className="inline-flex items-center space-x-1 px-3 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-lg text-xs font-bold transition-colors"
+                              className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 bg-pms-green hover:bg-pms-darkGreen text-white rounded-lg text-xs font-semibold transition-colors shadow-xs disabled:opacity-50"
                               title="Download PDF Report"
                             >
                               <Download size={14} />
-                              <span>PDF</span>
-                            </button>
-                            <button
-                              onClick={() => handleDownload(emp.assignmentId!, 'excel', emp.name)}
-                              disabled={downloading === emp.assignmentId}
-                              className="inline-flex items-center space-x-1 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-xs font-bold transition-colors"
-                              title="Download Excel Report"
-                            >
-                              <Download size={14} />
-                              <span>Excel</span>
+                              <span>{downloading === emp.assignmentId ? 'Downloading...' : 'Download PDF'}</span>
                             </button>
                           </div>
                         ) : (

@@ -28,6 +28,16 @@ export const hrApi = {
     return response.data;
   },
 
+  getDepartments: async (): Promise<{ id: number; name: string; description?: string }[]> => {
+    const response = await apiClient.get<{ id: number; name: string; description?: string }[]>('/api/hr/departments');
+    return response.data;
+  },
+
+  createDepartment: async (name: string, description?: string): Promise<{ id: number; name: string; message: string }> => {
+    const response = await apiClient.post<{ id: number; name: string; message: string }>('/api/hr/departments', { name, description });
+    return response.data;
+  },
+
   getManagers: async (): Promise<ManagerOption[]> => {
     const response = await apiClient.get<ManagerOption[]>('/api/hr/managers');
     return response.data;
@@ -51,6 +61,7 @@ export const hrApi = {
   updateEmployee: async (
     id: number,
     data: {
+      employeeCode?: string;
       name?: string;
       role?: string;
       designation?: string;
@@ -59,7 +70,7 @@ export const hrApi = {
       managerId?: number | null;
       accountStatus?: string;
     }
-  ): Promise<{ message: string; id: number }> => {
+  ): Promise<{ message: string; id: number; employeeCode?: string }> => {
     const response = await apiClient.put<{ message: string; id: number }>(`/api/hr/employees/${id}`, data);
     return response.data;
   },

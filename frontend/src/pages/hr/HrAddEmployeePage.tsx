@@ -35,6 +35,14 @@ export const HrAddEmployeePage: React.FC = () => {
   const [addRoleLoading, setAddRoleLoading] = useState(false);
   const [addRoleError, setAddRoleError] = useState<string | null>(null);
 
+  // Add New Department Modal State
+  const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
+  const [addDeptModalOpen, setAddDeptModalOpen] = useState(false);
+  const [newDeptName, setNewDeptName] = useState('');
+  const [newDeptDescription, setNewDeptDescription] = useState('');
+  const [addDeptLoading, setAddDeptLoading] = useState(false);
+  const [addDeptError, setAddDeptError] = useState<string | null>(null);
+
   // Form fields
   const [name, setName] = useState('');
   const [employeeCode, setEmployeeCode] = useState('');
@@ -45,7 +53,7 @@ export const HrAddEmployeePage: React.FC = () => {
   const [department, setDepartment] = useState('Engineering');
   const [team, setTeam] = useState('Core Platform');
   const [joiningDate, setJoiningDate] = useState('2026-08-27');
-  const [role, setRole] = useState<'EMPLOYEE' | 'MANAGER'>('EMPLOYEE');
+  const [role, setRole] = useState<'EMPLOYEE' | 'MANAGER' | 'HR'>('EMPLOYEE');
 
   // UI state
   const [submitting, setSubmitting] = useState(false);
@@ -53,20 +61,24 @@ export const HrAddEmployeePage: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
-    // Load designations and managers from database
-    Promise.all([hrApi.getDesignations(), hrApi.getManagers()])
-      .then(([desigs, mgrs]) => {
+    // Load designations, managers, and departments from database
+    Promise.all([hrApi.getDesignations(), hrApi.getManagers(), hrApi.getDepartments()])
+      .then(([desigs, mgrs, depts]) => {
         setDesignations(desigs);
         setManagers(mgrs);
+        setDepartments(depts);
         if (desigs.length > 0) {
           const initialDesig = desigs[0].name;
           setDesignation(initialDesig);
           fetchKpisForDesignation(initialDesig);
         }
+        if (depts.length > 0) {
+          setDepartment(depts[0].name);
+        }
       })
       .catch((err) => {
         console.error(err);
-        setError('Failed to load designations and managers from database.');
+        setError('Failed to load designations, managers, or departments from database.');
       });
   }, []);
 
@@ -115,13 +127,48 @@ export const HrAddEmployeePage: React.FC = () => {
     }
   };
 
+  const handleCreateDeptSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDeptName.trim()) {
+      setAddDeptError('Department name is required.');
+      return;
+    }
+    setAddDeptLoading(true);
+    setAddDeptError(null);
+    try {
+      const created = await hrApi.createDepartment(newDeptName.trim(), newDeptDescription.trim());
+      const updatedDepts = await hrApi.getDepartments();
+      setDepartments(updatedDepts);
+      setDepartment(created.name);
+      setNewDeptName('');
+      setNewDeptDescription('');
+      setAddDeptModalOpen(false);
+      setSuccess(`New department "${created.name}" created and automatically selected.`);
+    } catch (err: any) {
+      console.error(err);
+      setAddDeptError(err.response?.data?.message || err.message || 'Failed to create department.');
+    } finally {
+      setAddDeptLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
 
-    if (!name.trim() || !email.trim() || !password.trim() || !designation) {
-      setError('Please fill in all mandatory fields.');
+    if (!name.trim() || !employeeCode.trim() || !email.trim() || !password.trim() || !designation) {
+      setError('Please fill in all mandatory fields, including Employee ID / Code as per official HR records.');
+      return;
+    }
+
+    const isMinLength = password.length >= 8;
+    const hasAlphabet = /[a-zA-Z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    const hasSpecialChar = /[^a-zA-Z0-9]/.test(password);
+
+    if (!isMinLength || !hasAlphabet || !hasNumber || !hasSpecialChar) {
+      setError('Password must meet all security criteria: minimum 8 characters, alphabets, numbers, and special characters.');
       return;
     }
 
@@ -132,9 +179,10 @@ export const HrAddEmployeePage: React.FC = () => {
 
     setSubmitting(true);
     try {
+      const formattedCode = employeeCode.trim().toUpperCase();
       const res = await hrApi.createEmployee({
         name: name.trim(),
-        employeeCode: employeeCode.trim() || undefined,
+        employeeCode: formattedCode,
         email: email.trim().toLowerCase(),
         password,
         designation,
@@ -145,8 +193,12 @@ export const HrAddEmployeePage: React.FC = () => {
         role
       });
 
-      setSuccess(`Employee ${name} (${email}) created successfully! ${res.assignedKpisCount} KPIs automatically assigned to active PMS cycle.`);
+      const roleLabel = role === 'MANAGER' ? 'Reporting Manager' : role === 'HR' ? 'HR Administrator' : 'Employee';
+      setSuccess(`${roleLabel} "${name}" [${formattedCode}] (${email}) created successfully! ${res.assignedKpisCount} KPIs automatically assigned.`);
       
+      // Refresh managers list so newly created manager appears in dropdowns immediately
+      hrApi.getManagers().then(setManagers).catch(console.error);
+
       // Clear form fields
       setName('');
       setEmployeeCode('');
@@ -239,10 +291,11 @@ export const HrAddEmployeePage: React.FC = () => {
               </div>
             </div>
 
-            {/* Employee ID / Code */}
+            {/* Employee ID / Code (Mandatory as per HR records) */}
             <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">
-                Employee ID / Code
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                <span>Employee ID / Code *</span>
+                <span className="text-[10px] text-emerald-700 font-semibold lowercase">Official HR Record</span>
               </label>
               <div className="relative rounded-lg shadow-sm">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -250,12 +303,16 @@ export const HrAddEmployeePage: React.FC = () => {
                 </div>
                 <input
                   type="text"
+                  required
                   value={employeeCode}
-                  onChange={(e) => setEmployeeCode(e.target.value)}
-                  placeholder="e.g. EMP-105 (Auto-generated if empty)"
-                  className="block w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-lg text-sm text-pms-gray focus:ring-2 focus:ring-pms-green/50 focus:border-pms-green"
+                  onChange={(e) => setEmployeeCode(e.target.value.toUpperCase())}
+                  placeholder="e.g. EMP-105 or DSU-042 (Mandatory HR Code)"
+                  className="block w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-lg text-sm font-bold text-pms-gray focus:ring-2 focus:ring-pms-green/50 focus:border-pms-green uppercase"
                 />
               </div>
+              <p className="text-[10px] text-slate-400 mt-1 font-medium">
+                Enter the exact identifier from your company HR records.
+              </p>
             </div>
 
             {/* Email Address */}
@@ -298,6 +355,68 @@ export const HrAddEmployeePage: React.FC = () => {
               </div>
             </div>
 
+            {/* Corporate System Role Dropdown */}
+            <div>
+              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+                Corporate System Role *
+              </label>
+              <div className="relative rounded-lg shadow-sm">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <ShieldCheck size={16} />
+                </div>
+                <select
+                  value={role}
+                  onChange={(e) => {
+                    const newRole = e.target.value as 'EMPLOYEE' | 'MANAGER' | 'HR';
+                    setRole(newRole);
+                    if (newRole === 'MANAGER' && designation.toLowerCase().includes('engineer') && !designation.toLowerCase().includes('manager')) {
+                      const mgrDesig = designations.find(d => d.name.toLowerCase().includes('manager'));
+                      if (mgrDesig) {
+                        handleDesignationChange(mgrDesig.name);
+                      }
+                    } else if (newRole === 'HR' && !designation.toLowerCase().includes('hr')) {
+                      const hrDesig = designations.find(d => d.name.toLowerCase().includes('hr'));
+                      if (hrDesig) {
+                        handleDesignationChange(hrDesig.name);
+                      }
+                    }
+                  }}
+                  className="block w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-lg text-sm text-pms-gray font-medium focus:ring-2 focus:ring-pms-green/50 focus:border-pms-green"
+                >
+                  <option value="EMPLOYEE">EMPLOYEE (Individual Contributor)</option>
+                  <option value="MANAGER">MANAGER (Team Reporting Manager)</option>
+                  <option value="HR">HR (HR Administrator)</option>
+                </select>
+              </div>
+              <span className="text-[11px] text-slate-400 block mt-1">
+                {role === 'MANAGER'
+                  ? 'Managers can review direct reports and will be available as reporting managers.'
+                  : role === 'HR'
+                  ? 'HR administrators have full administrative access across the PMS platform.'
+                  : 'Individual contributor participating in appraisal review cycles.'}
+              </span>
+            </div>
+
+            {/* Reporting Manager Dropdown (DB Driven) */}
+            <div>
+              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+                Reporting Manager {role === 'EMPLOYEE' ? '*' : '(Optional)'}
+              </label>
+              <select
+                value={managerId}
+                onChange={(e) => setManagerId(e.target.value ? Number(e.target.value) : '')}
+                required={role === 'EMPLOYEE'}
+                className="block w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-pms-gray font-medium focus:ring-2 focus:ring-pms-green/50 focus:border-pms-green"
+              >
+                <option value="">{role === 'EMPLOYEE' ? '-- Select Reporting Manager --' : '-- No Manager (Independent / Self) --'}</option>
+                {managers.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.fullName} ({m.employeeCode}) - {m.designationName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Designation Dropdown (DB Driven) */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
@@ -332,38 +451,37 @@ export const HrAddEmployeePage: React.FC = () => {
               </select>
             </div>
 
-            {/* Reporting Manager Dropdown (DB Driven) */}
+            {/* Department Dropdown (DB Driven) */}
             <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">
-                Reporting Manager *
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider">
+                  Department
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewDeptName('');
+                    setNewDeptDescription('');
+                    setAddDeptError(null);
+                    setAddDeptModalOpen(true);
+                  }}
+                  className="text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline flex items-center space-x-1"
+                >
+                  <Plus size={14} />
+                  <span>+ Add New Department</span>
+                </button>
+              </div>
               <select
-                value={managerId}
-                onChange={(e) => setManagerId(e.target.value ? Number(e.target.value) : '')}
-                required={role === 'EMPLOYEE'}
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
                 className="block w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-pms-gray font-medium focus:ring-2 focus:ring-pms-green/50 focus:border-pms-green"
               >
-                <option value="">-- Select Reporting Manager --</option>
-                {managers.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.fullName} ({m.employeeCode}) - {m.designationName}
+                {departments.map((dept) => (
+                  <option key={dept.id} value={dept.name}>
+                    {dept.name}
                   </option>
                 ))}
               </select>
-            </div>
-
-            {/* Department */}
-            <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">
-                Department
-              </label>
-              <input
-                type="text"
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-                placeholder="Engineering"
-                className="block w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-pms-gray focus:ring-2 focus:ring-pms-green/50 focus:border-pms-green"
-              />
             </div>
 
             {/* Joining Date */}
@@ -521,6 +639,83 @@ export const HrAddEmployeePage: React.FC = () => {
                 >
                   <Plus size={16} />
                   <span>{addRoleLoading ? 'Saving Role...' : 'Save & Select Role'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Add New Department Modal */}
+      {addDeptModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-100 relative animate-scaleUp">
+            <button
+              onClick={() => setAddDeptModalOpen(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 p-2 rounded-full transition-all"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="flex items-center space-x-3 mb-5">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                <Plus size={20} />
+              </div>
+              <div>
+                <h3 className="text-lg font-extrabold text-slate-900">Add New Department</h3>
+                <p className="text-xs text-slate-500 font-medium">Create a company department for employee assignment</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleCreateDeptSubmit} className="space-y-4">
+              {addDeptError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-800 flex items-center space-x-2">
+                  <AlertCircle size={16} className="text-rose-600 shrink-0" />
+                  <span>{addDeptError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Department Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newDeptName}
+                  onChange={(e) => setNewDeptName(e.target.value)}
+                  placeholder="e.g. Data & Analytics, Customer Success"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Department Description (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={newDeptDescription}
+                  onChange={(e) => setNewDeptDescription(e.target.value)}
+                  placeholder="Department function & objectives..."
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
+                />
+              </div>
+
+              <div className="flex items-center space-x-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setAddDeptModalOpen(false)}
+                  className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={addDeptLoading}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all disabled:opacity-50 flex items-center justify-center space-x-1.5"
+                >
+                  <Plus size={16} />
+                  <span>{addDeptLoading ? 'Saving...' : 'Save & Select'}</span>
                 </button>
               </div>
             </form>

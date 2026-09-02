@@ -59,6 +59,7 @@ public class HrLifecycleService {
 
             return EmployeeDto.builder()
                     .id(e.getId())
+                    .employeeCode(e.getEmployeeCode() != null && !e.getEmployeeCode().isBlank() ? e.getEmployeeCode() : "EMP-" + e.getId())
                     .name(e.getName())
                     .email(e.getEmail())
                     .department(e.getDepartment() != null ? e.getDepartment() : "-")
@@ -85,6 +86,7 @@ public class HrLifecycleService {
 
         EmployeeDto empDto = EmployeeDto.builder()
                 .id(employee.getId())
+                .employeeCode(employee.getEmployeeCode() != null && !employee.getEmployeeCode().isBlank() ? employee.getEmployeeCode() : "EMP-" + employee.getId())
                 .name(employee.getName())
                 .email(employee.getEmail())
                 .department(employee.getDepartment() != null ? employee.getDepartment() : "-")

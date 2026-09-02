@@ -32,8 +32,9 @@ export const pmsApi = {
     const response = await apiClient.post<PmsAssignment>(`/employee/pms/${assignmentId}/submit`, data);
     return response.data;
   },
-  getHistory: async (): Promise<PmsHistory[]> => {
-    const response = await apiClient.get<PmsHistory[]>('/employee/pms/history');
+  getHistory: async (employeeId?: number): Promise<PmsHistory[]> => {
+    const url = employeeId ? `/employee/pms/history?employeeId=${employeeId}` : '/employee/pms/history';
+    const response = await apiClient.get<PmsHistory[]>(url);
     return response.data;
   },
   resetActiveCycle: async (): Promise<void> => {

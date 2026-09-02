@@ -14,7 +14,7 @@ import {
   Award
 } from 'lucide-react';
 
-import { RatingScaleLegend } from '../../components/RatingScaleLegend';
+import { RatingScaleLegend, RATING_DEFINITIONS } from '../../components/RatingScaleLegend';
 
 export const ManagerMyKpisPage: React.FC = () => {
   const [assignment, setAssignment] = useState<PmsAssignment | null>(null);
@@ -297,25 +297,49 @@ export const ManagerMyKpisPage: React.FC = () => {
                 </div>
 
                 {/* Rating Input */}
-                <div className="shrink-0 bg-slate-50 p-4 rounded-2xl border border-slate-200/80 flex flex-col items-center">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                    Self Rating (0 - 5)
+                <div className="shrink-0 bg-slate-50 p-4 rounded-2xl border border-slate-200/80 flex flex-col items-center space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Self Rating (0.0 - 5.0)
                   </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    max="5"
-                    disabled={isSubmittedOrLocked}
-                    value={currentRating}
-                    onChange={(e) => handleRatingChange(kpi.kpiId, e.target.value)}
-                    placeholder="0.0"
-                    className={`w-24 px-3 py-2 text-center text-xl font-bold rounded-xl border ${
-                      isSubmittedOrLocked
-                        ? 'bg-slate-100 text-slate-500 cursor-not-allowed border-slate-200'
-                        : 'bg-white text-slate-800 border-slate-300 focus:ring-2 focus:ring-pms-green focus:border-pms-green'
-                    }`}
-                  />
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="5"
+                      disabled={isSubmittedOrLocked}
+                      value={currentRating}
+                      onChange={(e) => handleRatingChange(kpi.kpiId, e.target.value)}
+                      placeholder="0.0"
+                      className={`w-20 px-2 py-1.5 text-center text-lg font-bold rounded-xl border ${
+                        isSubmittedOrLocked
+                          ? 'bg-slate-100 text-slate-500 cursor-not-allowed border-slate-200'
+                          : 'bg-white text-slate-800 border-slate-300 focus:ring-2 focus:ring-pms-green focus:border-pms-green'
+                      }`}
+                    />
+                    {!isSubmittedOrLocked && (
+                      <div className="flex space-x-1">
+                        {[1, 2, 3, 4, 5].map((num) => {
+                          const def = RATING_DEFINITIONS[num - 1];
+                          return (
+                            <button
+                              key={num}
+                              type="button"
+                              onClick={() => handleRatingChange(kpi.kpiId, num.toString())}
+                              title={`${num}: ${def.label} - ${def.shortDesc}`}
+                              className={`px-2.5 py-1.5 text-xs font-bold border rounded-lg transition-all ${
+                                Number(currentRating) === num
+                                  ? 'bg-pms-green text-white border-pms-green shadow-xs'
+                                  : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200'
+                              }`}
+                            >
+                              {num}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -337,6 +361,58 @@ export const ManagerMyKpisPage: React.FC = () => {
                   }`}
                 />
               </div>
+
+              {/* Display Manager & HR Feedback and Graphical Progress Bar */}
+              {(isSubmittedOrLocked || kpi.managerRating !== null || kpi.hrRating !== null) && (
+                <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wider">
+                      Evaluation Graph & Rating Status
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      Effective Score: {((kpi.hrRating ?? kpi.managerRating ?? kpi.selfRating ?? 0)).toFixed(1)} / 5.0
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5 pt-1">
+                    <div>
+                      <div className="flex justify-between text-[10px] text-slate-500 font-bold mb-0.5">
+                        <span>Self Rating</span>
+                        <span>{kpi.selfRating !== null && kpi.selfRating !== undefined ? kpi.selfRating.toFixed(1) : (currentRating !== '' ? Number(currentRating).toFixed(1) : 'N/A')} / 5.0</span>
+                      </div>
+                      <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                        <div className="bg-blue-500 h-full rounded-full transition-all" style={{ width: `${(((kpi.selfRating ?? Number(currentRating)) || 0) / 5) * 100}%` }}></div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between text-[10px] text-purple-700 font-bold mb-0.5">
+                        <span>Manager Rating</span>
+                        <span>{kpi.managerRating !== null && kpi.managerRating !== undefined ? `${kpi.managerRating.toFixed(1)} / 5.0` : 'Pending Review'}</span>
+                      </div>
+                      <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                        <div className="bg-purple-600 h-full rounded-full transition-all" style={{ width: `${((kpi.managerRating || 0) / 5) * 100}%` }}></div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between text-[10px] text-emerald-700 font-bold mb-0.5">
+                        <span>HR Rating (Final)</span>
+                        <span>{kpi.hrRating !== null && kpi.hrRating !== undefined ? `${kpi.hrRating.toFixed(1)} / 5.0` : 'Pending Review'}</span>
+                      </div>
+                      <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                        <div className="bg-emerald-600 h-full rounded-full transition-all" style={{ width: `${((kpi.hrRating || 0) / 5) * 100}%` }}></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {kpi.managerComments && (
+                    <div className="text-[11px] text-slate-700 bg-white p-2.5 rounded-lg border border-slate-200 italic mt-2">
+                      <span className="font-bold text-purple-900 not-italic">Review Remarks: </span>"{kpi.managerComments}"
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}

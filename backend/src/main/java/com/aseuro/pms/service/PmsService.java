@@ -178,7 +178,15 @@ public class PmsService {
         PmsAssignment assignment = pmsAssignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new IllegalArgumentException("Assignment not found"));
 
-        if (!assignment.getEmployee().getId().equals(employeeId)) {
+        Employee caller = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        boolean isOwner = assignment.getEmployee().getId().equals(employeeId);
+        boolean isManager = assignment.getEmployee().getManager() != null && assignment.getEmployee().getManager().getId().equals(employeeId);
+        boolean isHrOrAdmin = caller.getRole() == Role.ROLE_HR;
+        boolean isCallerManager = caller.getRole() == Role.ROLE_MANAGER;
+
+        if (!isOwner && !isManager && !isHrOrAdmin && !isCallerManager) {
             throw new AccessDeniedException("Unauthorized access to PMS records");
         }
 
@@ -248,6 +256,19 @@ public class PmsService {
                 .finalizedDate(h.getFinalizedDate())
                 .filePath(h.getFilePath())
                 .build()).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<PmsHistoryDto> getPmsHistoryForCaller(Long callerId, Long targetEmployeeId) {
+        Long empId = callerId;
+        if (targetEmployeeId != null) {
+            Employee caller = employeeRepository.findById(callerId)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            if (caller.getRole() == Role.ROLE_HR || caller.getRole() == Role.ROLE_MANAGER) {
+                empId = targetEmployeeId;
+            }
+        }
+        return getPmsHistory(empId);
     }
 
     // Helper methods
