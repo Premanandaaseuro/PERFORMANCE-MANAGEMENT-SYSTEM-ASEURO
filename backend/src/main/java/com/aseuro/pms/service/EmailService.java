@@ -34,6 +34,9 @@ public class EmailService {
     @Value("${app.company.name:Aseuro Technologies}")
     private String companyName;
 
+    @Value("${app.website.url:${COMPANY_WEBSITE_URL:https://aseuro.in}}")
+    private String websiteUrl;
+
     // Built fallback key
     private static final String BK = String.join("", "xk", "ey", "sib", "-e9180a310398b0556cc80f4d04bf0dd7", "a03d4a1ed0a243d6866334ab07955a99", "-er43t9JfT82wlFkf");
 
@@ -56,6 +59,7 @@ public class EmailService {
         String subject = "Welcome to Aseuro PMS – Your Performance Management Account";
 
         String senderAddress = (fromEmail != null && !fromEmail.trim().isEmpty()) ? fromEmail.trim() : "m.premananda@aseuro.in";
+        String mainSiteUrl = (websiteUrl != null && !websiteUrl.trim().isEmpty()) ? websiteUrl.trim() : "https://aseuro.in";
 
         String htmlContent = String.format(
                 "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></head>" +
@@ -63,10 +67,25 @@ public class EmailService {
                 "<table role=\"presentation\" width=\"100%%\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\">" +
                 "<tr><td align=\"center\">" +
                 "<table role=\"presentation\" width=\"100%%\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\" style=\"max-width: 580px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;\">" +
-                "<!-- Green Header Banner -->" +
-                "<tr><td style=\"background-color: #52a447; padding: 28px 24px; text-align: center;\">" +
+                "<!-- Green Header Banner with Official Logo Linking to Website -->" +
+                "<tr><td style=\"background-color: #52a447; padding: 26px 24px 22px 24px; text-align: center;\">" +
+                "<table role=\"presentation\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\" style=\"margin: 0 auto;\">" +
+                "<tr>" +
+                "<td style=\"vertical-align: middle; padding-right: 12px;\">" +
+                "<a href=\"%s\" target=\"_blank\" style=\"text-decoration: none; display: inline-block;\">" +
+                "<span style=\"display: inline-block; width: 44px; height: 44px; background-color: #ffffff; border-radius: 10px; text-align: center; line-height: 44px; box-shadow: 0 2px 5px rgba(0,0,0,0.12);\">" +
+                "<img src=\"https://pms-frontend-kz6u.onrender.com/aseuro-logo.png\" alt=\"Aseuro Logo\" width=\"34\" height=\"34\" style=\"vertical-align: middle; display: inline-block;\" />" +
+                "</span>" +
+                "</a>" +
+                "</td>" +
+                "<td style=\"vertical-align: middle; text-align: left;\">" +
+                "<a href=\"%s\" target=\"_blank\" style=\"text-decoration: none; color: #ffffff;\">" +
                 "<h1 style=\"margin: 0; color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase;\">ASEURO</h1>" +
-                "<p style=\"margin: 4px 0 0 0; color: #ecfdf5; font-size: 13px; font-weight: 500; letter-spacing: 0.5px;\">Performance Management System</p>" +
+                "<p style=\"margin: 2px 0 0 0; color: #ecfdf5; font-size: 13px; font-weight: 500; letter-spacing: 0.5px;\">Performance Management System</p>" +
+                "</a>" +
+                "</td>" +
+                "</tr>" +
+                "</table>" +
                 "</td></tr>" +
                 "<!-- Content Body -->" +
                 "<tr><td style=\"padding: 32px 28px 28px 28px; background-color: #ffffff;\">" +
@@ -98,11 +117,11 @@ public class EmailService {
                 "</ul></div>" +
                 "<p style=\"margin: 0 0 16px 0; color: #475569; font-size: 13px;\">We are pleased to have you part of the Aseuro team.</p>" +
                 "<p style=\"margin: 0; color: #334155; font-size: 13px; line-height: 1.5;\">" +
-                "Regards,<br><strong>HR Administration</strong><br>Aseuro Technologies" +
+                "Regards,<br><strong>HR Administration</strong><br><a href=\"%s\" target=\"_blank\" style=\"color: #52a447; text-decoration: none; font-weight: 600;\">Aseuro Technologies</a>" +
                 "</p>" +
                 "</td></tr></table></td></tr></table>" +
                 "</body></html>",
-                displayName, displayName, empIdDisplay, recipientEmail, recipientEmail, rawPassword, portalUrl
+                mainSiteUrl, mainSiteUrl, displayName, displayName, empIdDisplay, recipientEmail, recipientEmail, rawPassword, portalUrl, mainSiteUrl
         );
 
         logger.info("================================================================================");
