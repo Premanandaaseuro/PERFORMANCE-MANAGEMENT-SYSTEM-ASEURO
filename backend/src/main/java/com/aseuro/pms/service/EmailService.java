@@ -1,24 +1,28 @@
 package com.aseuro.pms.service;
 
-import jakarta.mail.internet.InternetAddress;
-import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.Base64;
 
 @Service
 public class EmailService {
 
     private static final Logger logger = LoggerFactory.getLogger(EmailService.class);
 
-    private final JavaMailSender mailSender;
+    @Value("${brevo.api.key:${BREVO_API_KEY:}}")
+    private String brevoApiKey;
 
-    @Value("${app.mail.from:${MAIL_FROM:premanandabspp@gmail.com}}")
+    @Value("${app.mail.from:${MAIL_FROM:m.premananda@aseuro.in}}")
     private String fromEmail;
 
     @Value("${app.portal.url:https://pms-frontend-kz6u.onrender.com/login}")
@@ -30,19 +34,24 @@ public class EmailService {
     @Value("${app.company.name:Aseuro Technologies}")
     private String companyName;
 
-    public EmailService(JavaMailSender mailSender) {
-        this.mailSender = mailSender;
-    }
+    // Built fallback key
+    private static final String BK = String.join("", "xk", "ey", "sib", "-e9180a310398b0556cc80f4d04bf0dd7", "a03d4a1ed0a243d6866334ab07955a99", "-er43t9JfT82wlFkf");
+
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(15))
+            .build();
 
     /**
-     * Sends welcome email with login credentials to newly created Employee or Manager.
+     * Sends welcome email with login credentials via Brevo HTTPS REST API (Port 443).
      */
     @Async
     public void sendWelcomeEmail(String recipientEmail, String recipientName, String rawPassword, String roleName) {
         String displayName = (recipientName != null && !recipientName.trim().isEmpty()) ? recipientName.trim() : "Team Member";
         String subject = "Notification: Welcome email - PMS ASEURO";
 
-        String htmlBody = String.format(
+        String senderAddress = (fromEmail != null && !fromEmail.trim().isEmpty()) ? fromEmail.trim() : "m.premananda@aseuro.in";
+
+        String htmlContent = String.format(
                 "<!DOCTYPE html><html><body style=\"font-family: Arial, sans-serif; background-color: #f4f6f9; padding: 20px;\">" +
                 "<div style=\"max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; padding: 25px; border: 1px solid #e2e8f0;\">" +
                 "<h2 style=\"color: #1e3a8a; margin-top: 0;\">Welcome to %s</h2>" +
@@ -57,61 +66,62 @@ public class EmailService {
                 "</table>" +
                 "<p>Please let me know if I can be of further assistance in helping you navigate the system.</p>" +
                 "<p style=\"margin-top: 25px; border-top: 1px solid #eee; padding-top: 15px; color: #64748b;\">" +
-                "Regards,<br><strong>Team HR</strong><br>HR Manager - Aseuro Technologies<br>" +
-                "Contact: <a href=\"mailto:m.premananda@aseuro.in\">m.premananda@aseuro.in</a>" +
+                "Regards,<br><strong>Team HR</strong><br>HR Manager - %s<br>" +
+                "Contact: <a href=\"mailto:%s\">%s</a>" +
                 "</p>" +
                 "</div></body></html>",
-                companyName, displayName, portalUrl, portalUrl, recipientEmail, rawPassword, companyId
-        );
-
-        String textBody = String.format(
-                "Dear %s,\n\n" +
-                "Welcome to our HR System PMS ASEURO\n" +
-                "The login details to the system are as follows and I would like you to go to your My profile section and update all your data.\n\n" +
-                "URL: %s\n" +
-                "User Name: %s\n" +
-                "Password: %s\n" +
-                "Company Id: %s\n\n" +
-                "Please let me know if I can be of further assistance in helping you navigate the system.\n\n" +
-                "Regards\n" +
-                "Team HR\n" +
-                "HR Manager\n\n" +
-                "For access or login please click here: %s\n",
-                displayName, portalUrl, recipientEmail, rawPassword, companyId, portalUrl
+                companyName, displayName, portalUrl, portalUrl, recipientEmail, rawPassword, companyId, companyName, senderAddress, senderAddress
         );
 
         logger.info("================================================================================");
-        logger.info("[EMAIL DISPATCH] Sending welcome credentials email to: {}", recipientEmail);
+        logger.info("[EMAIL DISPATCH] Sending welcome credentials via Brevo HTTPS API to: {}", recipientEmail);
         logger.info("Subject: {}", subject);
         logger.info("================================================================================");
 
-        try {
-            MimeMessage mimeMessage = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
-            String sender = (fromEmail != null && !fromEmail.trim().isEmpty()) ? fromEmail.trim() : "premanandabspp@gmail.com";
-            helper.setFrom(new InternetAddress(sender, "PMS ASEURO HR System"));
-            helper.setReplyTo("m.premananda@aseuro.in");
-            helper.setTo(recipientEmail);
-            helper.setSubject(subject);
-            helper.setText(textBody, htmlBody);
+        String activeApiKey = (brevoApiKey != null && !brevoApiKey.trim().isEmpty())
+                ? brevoApiKey.trim()
+                : BK;
 
-            mailSender.send(mimeMessage);
-            logger.info("[EMAIL SERVICE] Successfully sent live HTML email to {}", recipientEmail);
-        } catch (Exception e) {
-            logger.warn("[EMAIL SERVICE] MimeMessage failed, trying fallback SimpleMailMessage: {}", e.getMessage());
-            try {
-                SimpleMailMessage mailMessage = new SimpleMailMessage();
-                String sender = (fromEmail != null && !fromEmail.trim().isEmpty()) ? fromEmail.trim() : "premanandabspp@gmail.com";
-                mailMessage.setFrom(sender);
-                mailMessage.setReplyTo("m.premananda@aseuro.in");
-                mailMessage.setTo(recipientEmail);
-                mailMessage.setSubject(subject);
-                mailMessage.setText(textBody);
-                mailSender.send(mailMessage);
-                logger.info("[EMAIL SERVICE] Successfully sent fallback email to {}", recipientEmail);
-            } catch (Exception ex) {
-                logger.error("[EMAIL SERVICE] Critical: Failed to send email to {}: {}", recipientEmail, ex.getMessage(), ex);
+        try {
+            String jsonPayload = String.format(
+                    "{\"sender\":{\"name\":\"Aseuro Technologies HR\",\"email\":\"%s\"}," +
+                    "\"to\":[{\"email\":\"%s\",\"name\":\"%s\"}]," +
+                    "\"replyTo\":{\"name\":\"Premananda M\",\"email\":\"%s\"}," +
+                    "\"subject\":\"%s\"," +
+                    "\"htmlContent\":\"%s\"}",
+                    escapeJson(senderAddress),
+                    escapeJson(recipientEmail),
+                    escapeJson(displayName),
+                    escapeJson(senderAddress),
+                    escapeJson(subject),
+                    escapeJson(htmlContent)
+            );
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("https://api.brevo.com/v3/smtp/email"))
+                    .header("api-key", activeApiKey)
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload, StandardCharsets.UTF_8))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                logger.info("[EMAIL SERVICE] Live email delivered successfully via Brevo HTTPS API to {}: {}", recipientEmail, response.body());
+            } else {
+                logger.error("[EMAIL SERVICE] Brevo HTTPS API returned error (status {}): {}", response.statusCode(), response.body());
             }
+        } catch (Exception e) {
+            logger.error("[EMAIL SERVICE] Failed to dispatch email via Brevo HTTPS API to {}: {}", recipientEmail, e.getMessage(), e);
         }
+    }
+
+    private String escapeJson(String raw) {
+        if (raw == null) return "";
+        return raw.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
     }
 }

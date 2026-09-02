@@ -35,14 +35,10 @@ services:
           property: password
       - key: SERVER_PORT
         value: 8081
-      - key: MAIL_HOST
-        value: smtp.gmail.com
-      - key: MAIL_PORT
-        value: 587
-      - key: MAIL_USERNAME
-        value: premanandabspp@gmail.com
+      - key: BREVO_API_KEY
+        sync: false
       - key: MAIL_FROM
-        value: premanandabspp@gmail.com
+        value: m.premananda@aseuro.in
         
 
   # 2. Vite React Frontend Service (Free Tier)
