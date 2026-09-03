@@ -139,13 +139,19 @@ public class PmsService {
             assignment = assignmentOpt.get();
         } else {
             // Auto-create active PMS cycle for this employee / manager
+            LocalDate now = LocalDate.now();
+            LocalDate start = now.withDayOfMonth(1);
+            LocalDate end = start.plusMonths(1).minusDays(1);
+            LocalDate deadline = start.plusDays(25);
+            String monthName = start.format(java.time.format.DateTimeFormatter.ofPattern("MMMM yyyy", java.util.Locale.ENGLISH));
+
             assignment = PmsAssignment.builder()
                     .employee(employee)
-                    .cycleMonth("August 2026")
+                    .cycleMonth(monthName)
                     .status(PMSState.SELF_ASSESSMENT_DRAFT)
-                    .startDate(LocalDate.of(2026, 8, 1))
-                    .endDate(LocalDate.of(2026, 8, 31))
-                    .submissionDeadline(LocalDate.of(2026, 9, 10))
+                    .startDate(start)
+                    .endDate(end)
+                    .submissionDeadline(deadline)
                     .build();
             assignment = pmsAssignmentRepository.save(assignment);
 

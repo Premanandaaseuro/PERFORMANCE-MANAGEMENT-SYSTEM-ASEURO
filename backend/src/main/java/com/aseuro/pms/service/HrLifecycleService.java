@@ -22,6 +22,7 @@ public class HrLifecycleService {
     private final EmployeeReviewRepository employeeReviewRepository;
     private final FinalPmsResultRepository finalPmsResultRepository;
     private final PmsHistoryRepository pmsHistoryRepository;
+    private final KpiMasterRepository kpiMasterRepository;
 
     public HrLifecycleService(
             EmployeeRepository employeeRepository,
@@ -30,7 +31,8 @@ public class HrLifecycleService {
             EmployeeKpiRatingRepository employeeKpiRatingRepository,
             EmployeeReviewRepository employeeReviewRepository,
             FinalPmsResultRepository finalPmsResultRepository,
-            PmsHistoryRepository pmsHistoryRepository) {
+            PmsHistoryRepository pmsHistoryRepository,
+            KpiMasterRepository kpiMasterRepository) {
         this.employeeRepository = employeeRepository;
         this.pmsAssignmentRepository = pmsAssignmentRepository;
         this.pmsKpiRepository = pmsKpiRepository;
@@ -38,6 +40,7 @@ public class HrLifecycleService {
         this.employeeReviewRepository = employeeReviewRepository;
         this.finalPmsResultRepository = finalPmsResultRepository;
         this.pmsHistoryRepository = pmsHistoryRepository;
+        this.kpiMasterRepository = kpiMasterRepository;
     }
 
     @Transactional(readOnly = true)
@@ -520,5 +523,73 @@ public class HrLifecycleService {
         ));
 
         return stages;
+    }
+
+    @Transactional
+    public Map<String, Object> initiateCycle(InitiateCycleRequest request) {
+        if (request.getCycleMonth() == null || request.getCycleMonth().trim().isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Cycle month is required (e.g. 'October 2026')");
+        }
+
+        String cycleMonth = request.getCycleMonth().trim();
+        LocalDate startDate = request.getStartDate() != null ? request.getStartDate() : LocalDate.now().withDayOfMonth(1);
+        LocalDate endDate = request.getEndDate() != null ? request.getEndDate() : startDate.plusMonths(1).minusDays(1);
+        LocalDate submissionDeadline = request.getSubmissionDeadline() != null ? request.getSubmissionDeadline() : startDate.plusDays(25);
+
+        List<Employee> activeEmployees = employeeRepository.findAll().stream()
+                .filter(e -> !"INACTIVE".equalsIgnoreCase(e.getAccountStatus()))
+                .collect(Collectors.toList());
+
+        int createdCount = 0;
+        for (Employee emp : activeEmployees) {
+            Optional<PmsAssignment> existing = pmsAssignmentRepository.findByEmployeeAndCycleMonth(emp, cycleMonth);
+            if (existing.isPresent()) {
+                continue; // already exists for this cycle
+            }
+
+            PmsAssignment assignment = PmsAssignment.builder()
+                    .employee(emp)
+                    .cycleMonth(cycleMonth)
+                    .status(PMSState.SELF_ASSESSMENT_DRAFT)
+                    .startDate(startDate)
+                    .endDate(endDate)
+                    .submissionDeadline(submissionDeadline)
+                    .build();
+            assignment = pmsAssignmentRepository.save(assignment);
+
+            String designation = emp.getDesignation() != null ? emp.getDesignation().trim() : "Software Engineer";
+            List<KpiMaster> masterKpis = kpiMasterRepository.findByDesignationIgnoreCaseAndStatus(designation, "ACTIVE");
+            if (masterKpis.isEmpty()) {
+                masterKpis = kpiMasterRepository.findByDesignationIgnoreCaseAndStatus("Software Engineer", "ACTIVE");
+            }
+            if (masterKpis.isEmpty()) {
+                masterKpis = kpiMasterRepository.findByStatus("ACTIVE");
+            }
+
+            List<PmsKpi> assignedKpis = new ArrayList<>();
+            for (KpiMaster km : masterKpis) {
+                PmsKpi k = PmsKpi.builder()
+                        .assignment(assignment)
+                        .kpiName(km.getKpiName())
+                        .description(km.getDescription())
+                        .weightage(km.getWeightage())
+                        .build();
+                assignedKpis.add(k);
+            }
+            if (!assignedKpis.isEmpty()) {
+                pmsKpiRepository.saveAll(assignedKpis);
+            }
+            createdCount++;
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("cycleMonth", cycleMonth);
+        result.put("startDate", startDate);
+        result.put("endDate", endDate);
+        result.put("submissionDeadline", submissionDeadline);
+        result.put("initiatedEmployeesCount", createdCount);
+        result.put("totalActiveEmployees", activeEmployees.size());
+        result.put("message", "Successfully launched PMS cycle '" + cycleMonth + "' for " + createdCount + " employees.");
+        return result;
     }
 }

@@ -531,6 +531,13 @@ public class HrManagementController {
         return ResponseEntity.ok(data);
     }
 
+    // HR Initiate / Launch New Monthly Cycle
+    @PostMapping("/lifecycle/initiate-cycle")
+    public ResponseEntity<Map<String, Object>> initiateCycle(@RequestBody InitiateCycleRequest request) {
+        Map<String, Object> result = hrLifecycleService.initiateCycle(request);
+        return ResponseEntity.ok(result);
+    }
+
     // HR Edit KPI Ratings and Comments
     @PutMapping("/lifecycle/{assignmentId}/ratings")
     public ResponseEntity<Map<String, Object>> updateKpiRatings(

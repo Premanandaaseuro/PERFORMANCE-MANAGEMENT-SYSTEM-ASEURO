@@ -101,6 +101,19 @@ export const hrApi = {
     await apiClient.delete(`/api/hr/kpis/${id}`);
   },
 
+  initiateCycle: async (data: {
+    cycleMonth: string;
+    startDate?: string;
+    endDate?: string;
+    submissionDeadline?: string;
+  }): Promise<{ message: string; cycleMonth: string; initiatedEmployeesCount: number; totalActiveEmployees: number }> => {
+    const response = await apiClient.post<{ message: string; cycleMonth: string; initiatedEmployeesCount: number; totalActiveEmployees: number }>(
+      '/api/hr/lifecycle/initiate-cycle',
+      data
+    );
+    return response.data;
+  },
+
   searchLifecycleEmployees: async (query?: string): Promise<Employee[]> => {
     const response = await apiClient.get<Employee[]>('/api/hr/lifecycle/employees', {
       params: query ? { query } : {}

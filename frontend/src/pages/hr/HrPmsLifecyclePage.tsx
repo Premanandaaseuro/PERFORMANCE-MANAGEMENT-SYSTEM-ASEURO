@@ -18,7 +18,10 @@ import {
   ShieldCheck,
   ChevronRight,
   Download,
-  Save
+  Save,
+  Calendar,
+  PlusCircle,
+  Sparkles
 } from 'lucide-react';
 
 import { RatingScaleLegend } from '../../components/RatingScaleLegend';
@@ -32,6 +35,14 @@ export const HrPmsLifecyclePage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Initiate New Cycle Modal State
+  const [initiateModalOpen, setInitiateModalOpen] = useState(false);
+  const [newCycleMonth, setNewCycleMonth] = useState('October 2026');
+  const [newStartDate, setNewStartDate] = useState('2026-10-01');
+  const [newEndDate, setNewEndDate] = useState('2026-10-31');
+  const [newDeadline, setNewDeadline] = useState('2026-11-05');
+  const [initiating, setInitiating] = useState(false);
 
   // Finalize Modal State
   const [finalizeModalOpen, setFinalizeModalOpen] = useState(false);
@@ -233,6 +244,37 @@ export const HrPmsLifecyclePage: React.FC = () => {
     }
   };
 
+  const handleInitiateCycle = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCycleMonth.trim()) {
+      setError('Cycle month is required (e.g. "October 2026")');
+      return;
+    }
+    try {
+      setInitiating(true);
+      setError(null);
+      const res = await hrApi.initiateCycle({
+        cycleMonth: newCycleMonth.trim(),
+        startDate: newStartDate,
+        endDate: newEndDate,
+        submissionDeadline: newDeadline
+      });
+      setSuccess(res.message || `Successfully launched cycle '${newCycleMonth}' for ${res.initiatedEmployeesCount} employees!`);
+      setInitiateModalOpen(false);
+      // Refresh list
+      searchEmployees(searchQuery);
+      if (selectedEmployeeId) {
+        fetchLifecycle(selectedEmployeeId);
+      }
+      setTimeout(() => setSuccess(null), 6000);
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.response?.data?.message || err?.message || 'Failed to initiate PMS cycle');
+    } finally {
+      setInitiating(false);
+    }
+  };
+
   // Filter state for PMS status
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING_SELF' | 'PENDING_MANAGER' | 'PENDING_HR' | 'COMPLETED'>('ALL');
 
@@ -305,15 +347,25 @@ export const HrPmsLifecyclePage: React.FC = () => {
           </p>
         </div>
 
-        {lifecycleData?.hasActiveAssignment && (
+        <div className="flex flex-wrap items-center gap-3">
           <button
-            onClick={() => setFinalizeModalOpen(true)}
-            className="flex items-center space-x-2 px-5 py-2.5 bg-pms-green hover:bg-pms-darkGreen text-white text-xs font-bold rounded-xl shadow-md hover:shadow-lg transition-all"
+            onClick={() => setInitiateModalOpen(true)}
+            className="flex items-center space-x-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md hover:shadow-lg transition-all"
           >
-            <FileCheck size={16} />
-            <span>{isCompleted ? 'Update & Re-Publish Appraisal' : 'Finalise and Submit'}</span>
+            <PlusCircle size={16} />
+            <span>Launch New Monthly Cycle</span>
           </button>
-        )}
+
+          {lifecycleData?.hasActiveAssignment && (
+            <button
+              onClick={() => setFinalizeModalOpen(true)}
+              className="flex items-center space-x-2 px-5 py-2.5 bg-pms-green hover:bg-pms-darkGreen text-white text-xs font-bold rounded-xl shadow-md hover:shadow-lg transition-all"
+            >
+              <FileCheck size={16} />
+              <span>{isCompleted ? 'Update & Re-Publish Appraisal' : 'Finalise and Submit'}</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Top Summary Stat Cards for PMS Lifecycle Stages */}
@@ -859,6 +911,105 @@ export const HrPmsLifecyclePage: React.FC = () => {
                 <span>{finalizing ? 'Publishing...' : 'Finalise & Publish Result'}</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* LAUNCH NEW MONTHLY CYCLE MODAL */}
+      {initiateModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 md:p-8 shadow-2xl border border-slate-100 space-y-6 animate-scaleUp">
+            <div className="flex items-center space-x-3 pb-4 border-b border-slate-100">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                <Calendar size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-800">Launch New Monthly PMS Cycle</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Start appraisal cycle & assign master KPIs to all active employees</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleInitiateCycle} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Appraisal Cycle Month *
+                </label>
+                <input
+                  type="text"
+                  value={newCycleMonth}
+                  onChange={(e) => setNewCycleMonth(e.target.value)}
+                  placeholder="e.g. October 2026"
+                  required
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500/50"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Cycle Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={newStartDate}
+                    onChange={(e) => setNewStartDate(e.target.value)}
+                    required
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-emerald-500/50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Cycle End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={newEndDate}
+                    onChange={(e) => setNewEndDate(e.target.value)}
+                    required
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-emerald-500/50"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Self-Rating Submission Deadline
+                </label>
+                <input
+                  type="date"
+                  value={newDeadline}
+                  onChange={(e) => setNewDeadline(e.target.value)}
+                  required
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-emerald-500/50"
+                />
+              </div>
+
+              {/* Information Notice */}
+              <div className="bg-emerald-50/70 border border-emerald-200/60 rounded-2xl p-4 flex items-start space-x-3 text-xs text-emerald-800">
+                <Sparkles size={18} className="shrink-0 text-emerald-600 mt-0.5" />
+                <p className="leading-relaxed">
+                  Launching this cycle will automatically create new PMS assignments and assign official designation-based master KPIs (100% weightage) to all active employees, managers, and HR for self-rating.
+                </p>
+              </div>
+
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setInitiateModalOpen(false)}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={initiating}
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md hover:shadow-lg transition-all disabled:opacity-50 flex items-center space-x-2"
+                >
+                  <PlusCircle size={16} />
+                  <span>{initiating ? 'Launching Cycle...' : 'Launch Cycle & Assign KPIs'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
