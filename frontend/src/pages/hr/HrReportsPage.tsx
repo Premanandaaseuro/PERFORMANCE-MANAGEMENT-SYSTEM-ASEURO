@@ -864,10 +864,10 @@ export const HrReportsPage: React.FC = () => {
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-xs">
                       {lifecycle.kpis.map((kpi, index) => {
-                        const weightedScore =
-                          (kpi.selfRating != null ? kpi.selfRating * 0.1 : 0) +
-                          (kpi.managerRating != null ? kpi.managerRating * 0.65 : 0) +
-                          (kpi.hrRating != null ? kpi.hrRating * 0.25 : 0);
+                        const hrR = kpi.hrRating != null && kpi.hrRating >= 1.0 ? kpi.hrRating : null;
+                        const mgrR = kpi.managerRating != null && kpi.managerRating >= 1.0 ? kpi.managerRating : null;
+                        const effR = (hrR != null && mgrR != null) ? (hrR + mgrR) / 2.0 : (hrR ?? mgrR ?? 0);
+                        const weightedScore = effR * (kpi.weightage / 100);
 
                         return (
                           <tr key={kpi.kpiId} className="hover:bg-slate-50/50 transition-colors">

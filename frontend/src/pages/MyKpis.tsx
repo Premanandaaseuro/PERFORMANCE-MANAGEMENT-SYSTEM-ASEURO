@@ -161,8 +161,8 @@ export const MyKpis: React.FC = () => {
     Object.keys(ratings).forEach((key) => {
       const kpiId = Number(key);
       const val = ratings[kpiId];
-      if (val !== null && (val < 0.0 || val > 5.0)) {
-        errors[kpiId] = 'Rating must be between 0.0 and 5.0';
+      if (val !== null && (val < 1.0 || val > 5.0)) {
+        errors[kpiId] = 'Rating must be between 1.0 and 5.0. 0 is not allowed.';
       }
     });
 
@@ -194,14 +194,14 @@ export const MyKpis: React.FC = () => {
       const val = ratings[kpi.kpiId];
       if (val === null || val === undefined) {
         errors[kpi.kpiId] = 'Rating is required for submission';
-      } else if (val < 0.0 || val > 5.0) {
-        errors[kpi.kpiId] = 'Rating must be between 0.0 and 5.0';
+      } else if (val < 1.0 || val > 5.0) {
+        errors[kpi.kpiId] = 'Rating must be between 1.0 and 5.0';
       }
     });
 
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
-      setError('All KPIs must be rated with valid values (0.0 - 5.0) before submitting.');
+      setError('All KPIs must be rated with valid values (1.0 - 5.0) before submitting. Empty or zero ratings are not allowed.');
       setSubmitModalOpen(false);
       return;
     }
@@ -454,7 +454,7 @@ export const MyKpis: React.FC = () => {
                             Manager & HR Evaluation Graph
                           </span>
                           <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">
-                            Effective Score: {((kpi.hrRating ?? kpi.managerRating ?? kpi.selfRating ?? 0)).toFixed(1)} / 5.0
+                            Effective Score: {((kpi.hrRating != null && kpi.managerRating != null) ? (kpi.hrRating + kpi.managerRating) / 2.0 : (kpi.hrRating ?? kpi.managerRating ?? 0)).toFixed(1)} / 5.0
                           </span>
                         </div>
 

@@ -107,11 +107,12 @@ export const ManagerKpiReviewPage: React.FC = () => {
   const handleSubmitReview = async () => {
     if (!reviewData) return;
 
-    // Validation: All manager ratings provided must be between 0.0 and 5.0
+    // Mandatory Validation: All manager ratings must be between 1.0 and 5.0 (cannot be empty, null, or 0)
     for (const k of reviewData.kpis) {
       const entry = managerRatings[k.kpiId];
-      if (typeof entry?.rating === 'number' && (entry.rating < 0 || entry.rating > 5)) {
-        setError(`Rating must be between 0.0 and 5.0 for "${k.kpiName}".`);
+      const ratingNum = typeof entry?.rating === 'number' ? entry.rating : (entry?.rating ? Number(entry.rating) : null);
+      if (ratingNum === null || isNaN(ratingNum) || ratingNum < 1.0 || ratingNum > 5.0) {
+        setError(`All KPI ratings are mandatory (scale 1.0 to 5.0). Rating for "${k.kpiName}" cannot be empty or 0.`);
         return;
       }
     }

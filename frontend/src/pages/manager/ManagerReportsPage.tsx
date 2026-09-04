@@ -210,7 +210,9 @@ export const ManagerReportsPage: React.FC = () => {
                 <div className="space-y-4">
                   <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">KPI Ratings & Score Comparison Graphs</h3>
                   {myCurrentAssignment.kpis.map((kpi: any, idx: number) => {
-                    const effectiveRating = kpi.hrRating ?? kpi.managerRating ?? kpi.selfRating ?? 0;
+                    const effectiveRating = (kpi.hrRating != null && kpi.managerRating != null)
+                      ? (kpi.hrRating + kpi.managerRating) / 2.0
+                      : (kpi.hrRating ?? kpi.managerRating ?? 0);
                     return (
                       <div key={kpi.kpiId} className="bg-slate-50/70 rounded-2xl border border-slate-200/80 p-6 space-y-4">
                         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">

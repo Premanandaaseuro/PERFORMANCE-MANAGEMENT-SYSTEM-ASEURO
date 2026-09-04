@@ -186,11 +186,16 @@ public class HrLifecycleService {
             km.put("hrComments", r != null ? r.getHrComments() : null);
             km.put("ratingStatus", r != null ? r.getStatus() : "PENDING");
 
-            // Final score contribution - calculated from Manager and HR ratings only (strictly excluding employee self rating)
+            // Final score contribution - calculated from Manager and HR ratings average (strictly excluding employee self rating)
             Double effRating = null;
-            if (r != null) {
-                if (r.getHrRating() != null && r.getHrRating() >= 1.0) effRating = r.getHrRating();
-                else if (r.getManagerRating() != null && r.getManagerRating() >= 1.0) effRating = r.getManagerRating();
+            Double hrR = r != null ? r.getHrRating() : null;
+            Double mgrR = r != null ? r.getManagerRating() : null;
+            if (hrR != null && hrR >= 1.0 && mgrR != null && mgrR >= 1.0) {
+                effRating = (hrR + mgrR) / 2.0;
+            } else if (hrR != null && hrR >= 1.0) {
+                effRating = hrR;
+            } else if (mgrR != null && mgrR >= 1.0) {
+                effRating = mgrR;
             }
             if (effRating != null) {
                 calculatedWeightedSum += effRating * (kpi.getWeightage() / 100.0);
@@ -269,11 +274,25 @@ public class HrLifecycleService {
             }
         }
 
+        // Re-fetch ratings to evaluate mandatory checks and average calculation
+        List<PmsKpi> kpis = pmsKpiRepository.findByAssignment(assignment);
+        List<EmployeeKpiRating> ratings = employeeKpiRatingRepository.findByAssignment(assignment);
+
+        // Mandatory check: Every KPI must have valid Manager or HR rating >= 1.0 (empty or 0 not allowed)
+        for (PmsKpi kpi : kpis) {
+            EmployeeKpiRating r = ratings.stream()
+                    .filter(rt -> rt.getKpi().getId().equals(kpi.getId()))
+                    .findFirst().orElse(null);
+            Double hrR = r != null ? r.getHrRating() : null;
+            Double mgrR = r != null ? r.getManagerRating() : null;
+            if ((hrR == null || hrR < 1.0) && (mgrR == null || mgrR < 1.0)) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "All KPI ratings are mandatory (scale 1.0 to 5.0). Empty or 0 rating for KPI '" + kpi.getKpiName() + "' is not allowed.");
+            }
+        }
+
         // Calculate final score if not explicitly given
         Double finalScore = request.getOverallScore();
         if (finalScore == null || finalScore < 1.0 || finalScore > 5.0) {
-            List<PmsKpi> kpis = pmsKpiRepository.findByAssignment(assignment);
-            List<EmployeeKpiRating> ratings = employeeKpiRatingRepository.findByAssignment(assignment);
             double weightedSum = 0.0;
             double totalWeight = 0.0;
 
@@ -282,10 +301,14 @@ public class HrLifecycleService {
                         .filter(rt -> rt.getKpi().getId().equals(kpi.getId()))
                         .findFirst().orElse(null);
                 Double score = null;
-                if (r != null) {
-                    if (r.getHrRating() != null && r.getHrRating() >= 1.0) score = r.getHrRating();
-                    else if (r.getManagerRating() != null && r.getManagerRating() >= 1.0) score = r.getManagerRating();
-                    // Exclude employee self rating
+                Double hrR = r != null ? r.getHrRating() : null;
+                Double mgrR = r != null ? r.getManagerRating() : null;
+                if (hrR != null && hrR >= 1.0 && mgrR != null && mgrR >= 1.0) {
+                    score = (hrR + mgrR) / 2.0;
+                } else if (hrR != null && hrR >= 1.0) {
+                    score = hrR;
+                } else if (mgrR != null && mgrR >= 1.0) {
+                    score = mgrR;
                 }
                 if (score != null) {
                     weightedSum += score * (kpi.getWeightage() / 100.0);
@@ -423,10 +446,14 @@ public class HrLifecycleService {
                     .filter(rt -> rt.getKpi().getId().equals(kpi.getId()))
                     .findFirst().orElse(null);
             Double score = null;
-            if (r != null) {
-                if (r.getHrRating() != null && r.getHrRating() >= 1.0) score = r.getHrRating();
-                else if (r.getManagerRating() != null && r.getManagerRating() >= 1.0) score = r.getManagerRating();
-                // Strictly exclude employee self rating
+            Double hrR = r != null ? r.getHrRating() : null;
+            Double mgrR = r != null ? r.getManagerRating() : null;
+            if (hrR != null && hrR >= 1.0 && mgrR != null && mgrR >= 1.0) {
+                score = (hrR + mgrR) / 2.0;
+            } else if (hrR != null && hrR >= 1.0) {
+                score = hrR;
+            } else if (mgrR != null && mgrR >= 1.0) {
+                score = mgrR;
             }
             if (score != null) {
                 weightedSum += score * (kpi.getWeightage() / 100.0);

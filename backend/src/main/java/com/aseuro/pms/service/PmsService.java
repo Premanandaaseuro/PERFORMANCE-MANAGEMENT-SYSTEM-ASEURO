@@ -205,8 +205,8 @@ public class PmsService {
 
         if (request.getRatings() != null) {
             for (KpiRatingRequest.KpiRatingEntry entry : request.getRatings()) {
-                if (entry.getSelfRating() != null && (entry.getSelfRating() < 0.0 || entry.getSelfRating() > 5.0)) {
-                    throw new IllegalArgumentException("Rating must be between 0.0 and 5.0");
+                if (entry.getSelfRating() != null && (entry.getSelfRating() < 1.0 || entry.getSelfRating() > 5.0)) {
+                    throw new IllegalArgumentException("Rating must be between 1.0 and 5.0. Empty or 0 is not allowed.");
                 }
             }
         }
@@ -226,15 +226,12 @@ public class PmsService {
         // Validate that all KPIs are rated
         List<PmsKpi> kpis = pmsKpiRepository.findByAssignment(assignment);
         if (request.getRatings() == null || request.getRatings().size() != kpis.size()) {
-            throw new IllegalArgumentException("All KPIs must be rated for self-assessment submission.");
+            throw new IllegalArgumentException("All KPI ratings are mandatory (scale 1.0 to 5.0). Empty or 0 ratings are not allowed.");
         }
 
         for (KpiRatingRequest.KpiRatingEntry entry : request.getRatings()) {
-            if (entry.getSelfRating() == null) {
-                throw new IllegalArgumentException("Rating is required for KPI ID " + entry.getKpiId());
-            }
-            if (entry.getSelfRating() < 0.0 || entry.getSelfRating() > 5.0) {
-                throw new IllegalArgumentException("Rating must be between 0.0 and 5.0 for KPI ID " + entry.getKpiId());
+            if (entry.getSelfRating() == null || entry.getSelfRating() < 1.0 || entry.getSelfRating() > 5.0) {
+                throw new IllegalArgumentException("All KPI ratings are mandatory (scale 1.0 to 5.0). Empty or 0 rating is not allowed for KPI ID " + entry.getKpiId());
             }
         }
 

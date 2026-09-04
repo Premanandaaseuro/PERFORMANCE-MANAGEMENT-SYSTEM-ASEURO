@@ -115,7 +115,9 @@ export const HrPmsLifecyclePage: React.FC = () => {
       const mgrVal = (rawMgr !== null && rawMgr !== undefined && rawMgr !== '') ? Number(rawMgr) : null;
 
       let score: number | null = null;
-      if (hrVal !== null && hrVal >= 1.0 && hrVal <= 5.0) {
+      if (hrVal !== null && hrVal >= 1.0 && hrVal <= 5.0 && mgrVal !== null && mgrVal >= 1.0 && mgrVal <= 5.0) {
+        score = (hrVal + mgrVal) / 2.0;
+      } else if (hrVal !== null && hrVal >= 1.0 && hrVal <= 5.0) {
         score = hrVal;
       } else if (mgrVal !== null && mgrVal >= 1.0 && mgrVal <= 5.0) {
         score = mgrVal;
@@ -280,16 +282,20 @@ export const HrPmsLifecyclePage: React.FC = () => {
     setFinalizing(true);
     setError(null);
     try {
-      // Validate that ratings are between 1.0 and 5.0
+      // Mandatory validation: Every KPI must have valid Manager or HR rating between 1.0 and 5.0
       for (const kpi of lifecycleData.kpis || []) {
         const rawHr = hrRatings[kpi.kpiId] ?? kpi.hrRating;
-        if (rawHr !== undefined && rawHr !== null && rawHr !== '') {
-          const num = Number(rawHr);
-          if (num < 1.0 || num > 5.0) {
-            setError(`HR rating for "${kpi.kpiName}" must be between 1.0 and 5.0. 0 is not allowed.`);
-            setFinalizing(false);
-            return;
-          }
+        const rawMgr = managerRatings[kpi.kpiId] ?? kpi.managerRating;
+        const hrNum = (rawHr !== undefined && rawHr !== null && rawHr !== '') ? Number(rawHr) : null;
+        const mgrNum = (rawMgr !== undefined && rawMgr !== null && rawMgr !== '') ? Number(rawMgr) : null;
+
+        const hasValidHr = hrNum !== null && !isNaN(hrNum) && hrNum >= 1.0 && hrNum <= 5.0;
+        const hasValidMgr = mgrNum !== null && !isNaN(mgrNum) && mgrNum >= 1.0 && mgrNum <= 5.0;
+
+        if (!hasValidHr && !hasValidMgr) {
+          setError(`All KPI ratings are mandatory (scale 1.0 to 5.0). Rating for "${kpi.kpiName}" cannot be empty or 0.`);
+          setFinalizing(false);
+          return;
         }
       }
 

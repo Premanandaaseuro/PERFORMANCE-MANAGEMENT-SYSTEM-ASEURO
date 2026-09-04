@@ -321,14 +321,14 @@ public class ManagerService {
         }
 
         List<PmsKpi> kpis = pmsKpiRepository.findByAssignment(assignment);
-        if (request.getRatings() == null || request.getRatings().isEmpty()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Manager ratings cannot be empty.");
+        if (request.getRatings() == null || request.getRatings().size() != kpis.size()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "All KPI ratings are mandatory (scale 1.0 to 5.0). Empty or 0 ratings are not allowed.");
         }
 
-        // Validate all ratings between 0.0 and 5.0
+        // Validate all ratings are between 1.0 and 5.0 (cannot be null, empty, or 0)
         for (ManagerReviewRequest.ManagerKpiRatingEntry entry : request.getRatings()) {
-            if (entry.getManagerRating() != null && (entry.getManagerRating() < 0.0 || entry.getManagerRating() > 5.0)) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "Rating must be between 0.0 and 5.0 for KPI ID " + entry.getKpiId());
+            if (entry.getManagerRating() == null || entry.getManagerRating() < 1.0 || entry.getManagerRating() > 5.0) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "All KPI ratings are mandatory and must be between 1.0 and 5.0. Rating cannot be 0 or empty for KPI ID " + entry.getKpiId());
             }
         }
 

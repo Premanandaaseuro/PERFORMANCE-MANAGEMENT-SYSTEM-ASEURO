@@ -299,7 +299,9 @@ export const HistoryDetail: React.FC = () => {
             </thead>
             <tbody className="bg-white divide-y divide-slate-100 text-xs">
               {assignment.kpis.map((kpi) => {
-                const effectiveRating = kpi.hrRating ?? kpi.managerRating ?? kpi.selfRating ?? 0;
+                const effectiveRating = (kpi.hrRating != null && kpi.managerRating != null)
+                  ? (kpi.hrRating + kpi.managerRating) / 2.0
+                  : (kpi.hrRating ?? kpi.managerRating ?? 0);
                 return (
                   <tr key={kpi.kpiId} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-5 space-y-2">

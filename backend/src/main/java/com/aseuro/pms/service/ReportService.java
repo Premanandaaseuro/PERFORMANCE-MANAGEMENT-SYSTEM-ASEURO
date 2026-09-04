@@ -194,8 +194,15 @@ public class ReportService {
 
                 Double effRating = null;
                 if (rating != null) {
-                    if (rating.getHrRating() != null && rating.getHrRating() >= 1.0) effRating = rating.getHrRating();
-                    else if (rating.getManagerRating() != null && rating.getManagerRating() >= 1.0) effRating = rating.getManagerRating();
+                    Double hrR = rating.getHrRating();
+                    Double mgrR = rating.getManagerRating();
+                    if (hrR != null && hrR >= 1.0 && mgrR != null && mgrR >= 1.0) {
+                        effRating = (hrR + mgrR) / 2.0;
+                    } else if (hrR != null && hrR >= 1.0) {
+                        effRating = hrR;
+                    } else if (mgrR != null && mgrR >= 1.0) {
+                        effRating = mgrR;
+                    }
                 }
                 if (effRating == null && assignment.getOverallScore() != null) {
                     effRating = assignment.getOverallScore();
@@ -499,8 +506,15 @@ public class ReportService {
 
                 Double effRating = null;
                 if (rating != null) {
-                    if (rating.getHrRating() != null && rating.getHrRating() >= 1.0) effRating = rating.getHrRating();
-                    else if (rating.getManagerRating() != null && rating.getManagerRating() >= 1.0) effRating = rating.getManagerRating();
+                    Double hrR = rating.getHrRating();
+                    Double mgrR = rating.getManagerRating();
+                    if (hrR != null && hrR >= 1.0 && mgrR != null && mgrR >= 1.0) {
+                        effRating = (hrR + mgrR) / 2.0;
+                    } else if (hrR != null && hrR >= 1.0) {
+                        effRating = hrR;
+                    } else if (mgrR != null && mgrR >= 1.0) {
+                        effRating = mgrR;
+                    }
                 }
                 if (effRating == null && assignment.getOverallScore() != null) {
                     effRating = assignment.getOverallScore();
