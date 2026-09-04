@@ -123,13 +123,18 @@ export const MyKpis: React.FC = () => {
       const next = { ...prev };
       if (val === null) {
         delete next[kpiId];
-      } else if (val < 0.0 || val > 5.0) {
-        next[kpiId] = 'Rating must be between 0.0 and 5.0';
+      } else if (val < 1.0 || val > 5.0) {
+        next[kpiId] = 'Rating must be between 1.0 and 5.0. 0 is strictly not allowed.';
       } else {
         delete next[kpiId];
       }
       return next;
     });
+
+    if (val !== null && val < 1.0) {
+      setRatings((prev) => ({ ...prev, [kpiId]: null }));
+      return;
+    }
 
     setRatings((prev) => ({ ...prev, [kpiId]: val }));
   };
@@ -347,7 +352,7 @@ export const MyKpis: React.FC = () => {
               <tr>
                 <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-1/3">KPI & Criteria</th>
                 <th scope="col" className="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider w-16">Weight</th>
-                <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-1/4">Self Rating (0.0 - 5.0)</th>
+                <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-1/4">Self Rating (1.0 - 5.0)</th>
                 <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-1/4">Comments / Evidence</th>
                 <th scope="col" className="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider w-24">Status</th>
               </tr>
@@ -385,6 +390,8 @@ export const MyKpis: React.FC = () => {
                             <input
                               type="number"
                               step="0.1"
+                              min="1"
+                              max="5"
                               value={currentRating !== null && currentRating !== undefined ? currentRating : ''}
                               onChange={(e) => {
                                 const val = e.target.value === '' ? null : Number(e.target.value);
@@ -392,7 +399,7 @@ export const MyKpis: React.FC = () => {
                               }}
                               className={`w-20 px-3 py-2 border rounded-lg text-sm font-semibold text-pms-gray text-center focus:outline-none focus:ring-2 focus:ring-pms-green/50 focus:border-pms-green transition-all ${ratingError ? 'border-rose-400 bg-rose-50/20' : 'border-slate-200'
                                 }`}
-                              placeholder="0.0"
+                              placeholder="1.0"
                             />
 
                             {/* Simple Quick Scale Buttons */}
@@ -556,7 +563,7 @@ export const MyKpis: React.FC = () => {
                         <input
                           type="number"
                           step="0.1"
-                          min="0"
+                          min="1"
                           max="5"
                           value={currentRating !== null && currentRating !== undefined ? currentRating : ''}
                           onChange={(e) => {
@@ -564,7 +571,7 @@ export const MyKpis: React.FC = () => {
                             handleRatingChange(kpi.kpiId, val);
                           }}
                           className="w-16 px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-semibold text-center focus:outline-none focus:ring-pms-green focus:border-pms-green"
-                          placeholder="0.0"
+                          placeholder="1.0"
                         />
                         <div className="flex space-x-0.5 flex-wrap">
                           {[1, 2, 3, 4, 5].map((num) => (

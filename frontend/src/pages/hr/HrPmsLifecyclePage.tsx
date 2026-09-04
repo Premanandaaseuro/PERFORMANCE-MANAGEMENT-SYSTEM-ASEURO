@@ -150,7 +150,7 @@ export const HrPmsLifecyclePage: React.FC = () => {
         const initialHrComments: Record<number, string> = {};
 
         data.kpis.forEach((kpi) => {
-          initialHrRatings[kpi.kpiId] = (kpi.hrRating !== null && kpi.hrRating !== undefined && kpi.hrRating >= 1.0) ? kpi.hrRating : '';
+          initialHrRatings[kpi.kpiId] = (kpi.hrRating !== null && kpi.hrRating !== undefined && kpi.hrRating >= 1.0) ? kpi.hrRating : 0;
           initialMgrRatings[kpi.kpiId] = (kpi.managerRating !== null && kpi.managerRating !== undefined && kpi.managerRating >= 1.0) ? kpi.managerRating : '';
           initialSelfRatings[kpi.kpiId] = (kpi.selfRating !== null && kpi.selfRating !== undefined && kpi.selfRating >= 1.0) ? kpi.selfRating : '';
           initialEmpComments[kpi.kpiId] = kpi.employeeComments || kpi.comments || '';
@@ -910,10 +910,10 @@ export const HrPmsLifecyclePage: React.FC = () => {
                                 min="1"
                                 max="5"
                                 disabled={!isManagerReviewDone || isCompleted}
-                                value={hrRatings[kpi.kpiId] !== undefined ? hrRatings[kpi.kpiId] : (kpi.hrRating ?? '')}
+                                value={hrRatings[kpi.kpiId] !== undefined && hrRatings[kpi.kpiId] !== '' ? hrRatings[kpi.kpiId] : 0}
                                 onChange={(e) => {
                                   const raw = e.target.value;
-                                  let finalVal: number | string = '';
+                                  let finalVal: number | string = 0;
                                   if (raw !== '') {
                                     const num = parseFloat(raw);
                                     if (!isNaN(num)) {
@@ -926,7 +926,7 @@ export const HrPmsLifecyclePage: React.FC = () => {
                                   setHrRatings(nextHr);
                                   recalculateHrScore(lifecycleData?.kpis || [], nextHr, managerRatings);
                                 }}
-                                placeholder="1.0 - 5.0"
+                                placeholder="0"
                                 className="w-20 px-2 py-1 text-center font-extrabold text-xs border rounded-lg border-blue-300 text-blue-800 bg-blue-50/50 focus:bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                               />
                             </div>

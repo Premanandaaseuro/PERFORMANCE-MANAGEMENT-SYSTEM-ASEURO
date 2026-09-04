@@ -60,7 +60,7 @@ export const ManagerKpiReviewPage: React.FC = () => {
       if (data.kpis) {
         data.kpis.forEach((k: ManagerKpiReviewDetail) => {
           initial[k.kpiId] = {
-            rating: k.managerRating !== null ? k.managerRating : '',
+            rating: (k.managerRating !== null && k.managerRating >= 1.0) ? k.managerRating : '',
             comments: k.managerComments || ''
           };
         });
@@ -77,8 +77,25 @@ export const ManagerKpiReviewPage: React.FC = () => {
 
   const handleRatingChange = (kpiId: number, val: string) => {
     if (!reviewData?.canReview) return;
-    const num = val === '' ? '' : parseFloat(val);
-    if (typeof num === 'number' && (num < 0 || num > 5)) return;
+    if (val === '') {
+      setManagerRatings(prev => ({
+        ...prev,
+        [kpiId]: { ...prev[kpiId], rating: '' }
+      }));
+      setError(null);
+      return;
+    }
+    const num = parseFloat(val);
+    if (isNaN(num)) return;
+    if (num < 1.0) {
+      setError('Ratings must be between 1.0 and 5.0. 0 is strictly not allowed.');
+      return;
+    }
+    if (num > 5.0) {
+      setError('Rating cannot exceed 5.0.');
+      return;
+    }
+    setError(null);
     setManagerRatings(prev => ({
       ...prev,
       [kpiId]: { ...prev[kpiId], rating: num }
@@ -317,19 +334,19 @@ export const ManagerKpiReviewPage: React.FC = () => {
                   ) : (
                     <div className="bg-emerald-50/60 p-4 rounded-2xl border border-emerald-200 text-center space-y-2">
                       <label className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
-                        Manager Rating (0.0 - 5.0)
+                        Manager Rating (1.0 - 5.0)
                       </label>
                       <div className="flex items-center space-x-2">
                         <input
                           type="number"
                           step="0.1"
-                          min="0"
+                          min="1"
                           max="5"
                           disabled={isLocked || submitting}
                           value={currentRating}
                           onChange={(e) => handleRatingChange(kpi.kpiId, e.target.value)}
-                          placeholder="0.0"
-                          className={`w-20 px-2 py-1.5 text-center text-lg font-black rounded-xl border ${
+                          placeholder="1.0 - 5.0"
+                          className={`w-24 px-2 py-1.5 text-center text-lg font-black rounded-xl border ${
                             isLocked
                               ? 'bg-white/80 text-slate-600 border-slate-200 cursor-not-allowed'
                               : 'bg-white text-pms-darkGreen border-emerald-300 focus:ring-2 focus:ring-pms-green'
