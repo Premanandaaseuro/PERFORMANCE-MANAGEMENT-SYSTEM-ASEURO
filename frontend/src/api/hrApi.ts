@@ -169,5 +169,50 @@ export const hrApi = {
       responseType: 'blob'
     });
     return response.data;
+  },
+
+  getCycleOverallReport: async (cycleMonth?: string): Promise<{
+    cycleMonth: string;
+    totalEmployees: number;
+    completedCount: number;
+    inProgressCount: number;
+    averageScore: number | null;
+    availableCycles?: string[];
+    employees: Array<{
+      assignmentId: number;
+      employeeId: number;
+      employeeCode: string;
+      name: string;
+      designation: string;
+      department: string;
+      managerName: string;
+      cycleMonth: string;
+      status: string;
+      overallScore: number | null;
+      performanceGrade: string;
+      finalizedDate: string;
+      profilePhoto?: string | null;
+    }>;
+  }> => {
+    const response = await apiClient.get('/api/hr/reports/cycle/view', {
+      params: cycleMonth ? { cycleMonth } : {}
+    });
+    return response.data;
+  },
+
+  downloadCycleExcelReport: async (cycleMonth?: string): Promise<Blob> => {
+    const response = await apiClient.get('/api/hr/reports/cycle/excel', {
+      params: cycleMonth ? { cycleMonth } : {},
+      responseType: 'blob'
+    });
+    return response.data;
+  },
+
+  downloadCyclePdfReport: async (cycleMonth?: string): Promise<Blob> => {
+    const response = await apiClient.get('/api/hr/reports/cycle/pdf', {
+      params: cycleMonth ? { cycleMonth } : {},
+      responseType: 'blob'
+    });
+    return response.data;
   }
 };

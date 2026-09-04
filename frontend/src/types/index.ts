@@ -356,7 +356,7 @@ export interface ManagerEmployeeReviewData {
 export interface ManagerReviewPayload {
   ratings: Array<{
     kpiId: number;
-    managerRating: number;
+    managerRating: number | null;
     managerComments?: string;
   }>;
   managerComments?: string;

@@ -177,6 +177,10 @@ export const HrPmsLifecyclePage: React.FC = () => {
 
   const handleSaveRatingsAndComments = async () => {
     if (!lifecycleData?.assignmentId) return;
+    if (!isManagerReviewDone) {
+      setError('Manager review is pending for this employee. HR evaluation and rating edits are unlocked only after the reporting manager submits their review.');
+      return;
+    }
     try {
       setSavingRatings(true);
       setError(null);
@@ -279,6 +283,10 @@ export const HrPmsLifecyclePage: React.FC = () => {
 
   const handleFinalizePms = async () => {
     if (!lifecycleData || !lifecycleData.assignmentId) return;
+    if (!isManagerReviewDone) {
+      setError('Manager review is pending for this employee. HR finalization is unlocked only after the reporting manager submits their review.');
+      return;
+    }
     setFinalizing(true);
     setError(null);
     try {
@@ -422,6 +430,12 @@ export const HrPmsLifecyclePage: React.FC = () => {
   };
 
   const isCompleted = lifecycleData?.status === 'COMPLETED' || lifecycleData?.status === 'FINAL_RESULT_PUBLISHED';
+  const isManagerReviewDone =
+    lifecycleData?.status === 'MANAGER_REVIEW_SUBMITTED' ||
+    lifecycleData?.status === 'HR_REVIEW_PENDING' ||
+    lifecycleData?.status === 'HR_REVIEW_COMPLETED' ||
+    lifecycleData?.status === 'FINAL_RESULT_PUBLISHED' ||
+    lifecycleData?.status === 'COMPLETED';
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -452,8 +466,18 @@ export const HrPmsLifecyclePage: React.FC = () => {
 
           {lifecycleData?.hasActiveAssignment && (
             <button
-              onClick={() => setFinalizeModalOpen(true)}
-              className="flex items-center space-x-2 px-5 py-2.5 bg-pms-green hover:bg-pms-darkGreen text-white text-xs font-bold rounded-xl shadow-md hover:shadow-lg transition-all"
+              onClick={() => {
+                if (!isManagerReviewDone) {
+                  setError('Manager review is pending for this employee. HR appraisal finalization is locked until the reporting manager submits their review.');
+                  return;
+                }
+                setFinalizeModalOpen(true);
+              }}
+              disabled={!isManagerReviewDone}
+              title={!isManagerReviewDone ? 'Locked: Awaiting Manager Review submission' : ''}
+              className={`flex items-center space-x-2 px-5 py-2.5 text-white text-xs font-bold rounded-xl shadow-md transition-all ${
+                !isManagerReviewDone ? 'bg-slate-400 cursor-not-allowed opacity-60' : 'bg-pms-green hover:bg-pms-darkGreen hover:shadow-lg'
+              }`}
             >
               <FileCheck size={16} />
               <span>{isCompleted ? 'Update & Re-Publish Appraisal' : 'Finalise and Submit'}</span>
@@ -749,6 +773,17 @@ export const HrPmsLifecyclePage: React.FC = () => {
                 </div>
               </div>
 
+              {/* Manager Review Pending Warning Banner */}
+              {!isManagerReviewDone && (
+                <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl flex items-center space-x-3 text-amber-900 text-xs font-semibold shadow-xs">
+                  <AlertCircle size={22} className="shrink-0 text-amber-600" />
+                  <div>
+                    <span className="font-bold text-sm block">Manager Review Pending</span>
+                    The reporting manager (<strong className="text-amber-950">{lifecycleData?.employee?.managerName || 'Reporting Manager'}</strong>) has not yet submitted their review for this cycle. HR ratings, rating edits, and appraisal finalization will unlock once the manager submits their review.
+                  </div>
+                </div>
+              )}
+
               {/* KPI Ratings & Evaluation Matrix Table */}
               <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm overflow-hidden space-y-4 p-5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-100">
@@ -762,8 +797,10 @@ export const HrPmsLifecyclePage: React.FC = () => {
                   </div>
                   <button
                     onClick={handleSaveRatingsAndComments}
-                    disabled={savingRatings}
-                    className="px-5 py-2.5 bg-pms-green hover:bg-pms-darkGreen text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center space-x-2 shrink-0"
+                    disabled={!isManagerReviewDone || savingRatings}
+                    className={`px-5 py-2.5 text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center space-x-2 shrink-0 ${
+                      !isManagerReviewDone ? 'bg-slate-400 cursor-not-allowed opacity-60' : 'bg-pms-green hover:bg-pms-darkGreen'
+                    }`}
                   >
                     <Save size={15} />
                     <span>{savingRatings ? 'Saving Changes...' : 'Save Ratings & Comments'}</span>
@@ -801,11 +838,12 @@ export const HrPmsLifecyclePage: React.FC = () => {
                               <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
                                 Self Rating
                               </label>
-                              <input
+                                <input
                                 type="number"
                                 step="0.1"
                                 min="1"
                                 max="5"
+                                disabled={!isManagerReviewDone || isCompleted}
                                 value={selfRatings[kpi.kpiId] !== undefined ? selfRatings[kpi.kpiId] : (kpi.selfRating ?? '')}
                                 onChange={(e) => {
                                   const raw = e.target.value;
@@ -825,7 +863,7 @@ export const HrPmsLifecyclePage: React.FC = () => {
                                   }
                                 }}
                                 placeholder="1.0 - 5.0"
-                                className="w-20 px-2 py-1 text-center font-extrabold text-xs border rounded-lg border-emerald-300 text-emerald-800 bg-emerald-50/50 focus:bg-white"
+                                className="w-20 px-2 py-1 text-center font-extrabold text-xs border rounded-lg border-emerald-300 text-emerald-800 bg-emerald-50/50 focus:bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                               />
                             </div>
 
@@ -839,6 +877,7 @@ export const HrPmsLifecyclePage: React.FC = () => {
                                 step="0.1"
                                 min="1"
                                 max="5"
+                                disabled={!isManagerReviewDone || isCompleted}
                                 value={managerRatings[kpi.kpiId] !== undefined ? managerRatings[kpi.kpiId] : (kpi.managerRating ?? '')}
                                 onChange={(e) => {
                                   const raw = e.target.value;
@@ -856,7 +895,7 @@ export const HrPmsLifecyclePage: React.FC = () => {
                                   recalculateHrScore(lifecycleData?.kpis || [], hrRatings, nextMgr);
                                 }}
                                 placeholder="1.0 - 5.0"
-                                className={`w-20 px-2 py-1 text-center font-extrabold text-xs border rounded-lg ${isHr25 ? 'border-purple-300 text-purple-900 bg-purple-100/50' : 'border-purple-200 text-purple-700 bg-purple-50/30'} focus:bg-white`}
+                                className={`w-20 px-2 py-1 text-center font-extrabold text-xs border rounded-lg ${isHr25 ? 'border-purple-300 text-purple-900 bg-purple-100/50' : 'border-purple-200 text-purple-700 bg-purple-50/30'} focus:bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed`}
                               />
                             </div>
 
@@ -870,6 +909,7 @@ export const HrPmsLifecyclePage: React.FC = () => {
                                 step="0.1"
                                 min="1"
                                 max="5"
+                                disabled={!isManagerReviewDone || isCompleted}
                                 value={hrRatings[kpi.kpiId] !== undefined ? hrRatings[kpi.kpiId] : (kpi.hrRating ?? '')}
                                 onChange={(e) => {
                                   const raw = e.target.value;
@@ -887,7 +927,7 @@ export const HrPmsLifecyclePage: React.FC = () => {
                                   recalculateHrScore(lifecycleData?.kpis || [], nextHr, managerRatings);
                                 }}
                                 placeholder="1.0 - 5.0"
-                                className="w-20 px-2 py-1 text-center font-extrabold text-xs border rounded-lg border-blue-300 text-blue-800 bg-blue-50/50 focus:bg-white"
+                                className="w-20 px-2 py-1 text-center font-extrabold text-xs border rounded-lg border-blue-300 text-blue-800 bg-blue-50/50 focus:bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                               />
                             </div>
                           </div>

@@ -593,4 +593,40 @@ public class HrManagementController {
                 .contentType(mediaType)
                 .body(data);
     }
+
+    // 12. Overall PMS Cycle Report View (All Employees for a specific cycle)
+    @GetMapping("/reports/cycle/view")
+    public ResponseEntity<Map<String, Object>> getCycleOverallReport(
+            @RequestParam(required = false) String cycleMonth) {
+        Map<String, Object> report = hrLifecycleService.getCycleOverallReport(cycleMonth);
+        return ResponseEntity.ok(report);
+    }
+
+    // 13. Download Overall PMS Cycle Excel Report (All Employees)
+    @GetMapping("/reports/cycle/excel")
+    public ResponseEntity<byte[]> downloadCycleExcelReport(
+            @RequestParam(required = false) String cycleMonth) throws IOException {
+        byte[] data = reportService.generateCycleExcelReport(cycleMonth);
+        String safeName = (cycleMonth != null && !cycleMonth.trim().isEmpty()) ? cycleMonth.trim().replace(" ", "_") : "All_Cycles";
+        String filename = "Overall_PMS_Report_" + safeName + ".xlsx";
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(data);
+    }
+
+    // 14. Download Overall PMS Cycle PDF Report (All Employees)
+    @GetMapping("/reports/cycle/pdf")
+    public ResponseEntity<byte[]> downloadCyclePdfReport(
+            @RequestParam(required = false) String cycleMonth) throws IOException {
+        byte[] data = reportService.generateCyclePdfReport(cycleMonth);
+        String safeName = (cycleMonth != null && !cycleMonth.trim().isEmpty()) ? cycleMonth.trim().replace(" ", "_") : "All_Cycles";
+        String filename = "Overall_PMS_Report_" + safeName + ".pdf";
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(data);
+    }
 }

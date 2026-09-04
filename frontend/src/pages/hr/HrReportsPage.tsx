@@ -57,16 +57,94 @@ export const HrReportsPage: React.FC = () => {
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'CORPORATE' | 'SELF'>('CORPORATE');
+  const [activeTab, setActiveTab] = useState<'OVERALL' | 'CORPORATE' | 'SELF'>('OVERALL');
   const [myHistoryList, setMyHistoryList] = useState<PmsHistory[]>([]);
   const [downloadingMyId, setDownloadingMyId] = useState<number | null>(null);
+
+  // Overall Cycle Report State
+  const [cycleOverallMonth, setCycleOverallMonth] = useState<string>('ALL');
+  const [cycleOverallData, setCycleOverallData] = useState<{
+    cycleMonth: string;
+    totalEmployees: number;
+    completedCount: number;
+    inProgressCount: number;
+    averageScore: number | null;
+    availableCycles?: string[];
+    employees: Array<{
+      assignmentId: number;
+      employeeId: number;
+      employeeCode: string;
+      name: string;
+      designation: string;
+      department: string;
+      managerName: string;
+      cycleMonth: string;
+      status: string;
+      overallScore: number | null;
+      performanceGrade: string;
+      finalizedDate: string;
+      profilePhoto?: string | null;
+    }>;
+  } | null>(null);
+  const [loadingCycleReport, setLoadingCycleReport] = useState<boolean>(false);
+  const [downloadingCycle, setDownloadingCycle] = useState<boolean>(false);
+  const [cycleSearchTerm, setCycleSearchTerm] = useState<string>('');
+  const [cycleStatusFilter, setCycleStatusFilter] = useState<'ALL' | 'COMPLETED' | 'IN_PROGRESS'>('ALL');
 
   // Category Employee Drilldown Modal State
   const [modalCategory, setModalCategory] = useState<string | null>(null);
   const [modalSearchTerm, setModalSearchTerm] = useState('');
 
+  const fetchCycleOverallReport = (month?: string) => {
+    setLoadingCycleReport(true);
+    const target = (month && month !== 'ALL') ? month : undefined;
+    hrApi.getCycleOverallReport(target)
+      .then((data) => {
+        setCycleOverallData(data);
+        setLoadingCycleReport(false);
+      })
+      .catch((err) => {
+        console.error('Failed to load overall cycle report', err);
+        setLoadingCycleReport(false);
+      });
+  };
+
+  const handleDownloadCycleReport = async (format: 'pdf' | 'excel') => {
+    try {
+      setDownloadingCycle(true);
+      const target = (cycleOverallMonth && cycleOverallMonth !== 'ALL') ? cycleOverallMonth : undefined;
+      const blob = format === 'excel'
+        ? await hrApi.downloadCycleExcelReport(target)
+        : await hrApi.downloadCyclePdfReport(target);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const safeName = (cycleOverallMonth && cycleOverallMonth !== 'ALL') ? cycleOverallMonth.replace(/\s+/g, '_') : 'All_Cycles';
+      a.download = `Overall_PMS_Report_${safeName}.${format === 'excel' ? 'xlsx' : 'pdf'}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err: any) {
+      console.error('Failed to download overall cycle report', err);
+      alert('Failed to download overall cycle report. Please try again.');
+    } finally {
+      setDownloadingCycle(false);
+    }
+  };
+
+  const handleViewEmployeeLifecycle = (empId: number, targetCycle?: string) => {
+    setSelectedEmployeeId(empId);
+    if (targetCycle) {
+      setCycleMonth(targetCycle);
+    }
+    fetchEmployeeReport(empId, targetCycle);
+    setActiveTab('CORPORATE');
+  };
+
   useEffect(() => {
-    // Load summary and employees
+    // Load summary, employees, and cycle overall report
+    fetchCycleOverallReport('ALL');
     Promise.all([
       hrApi.getReportsSummary(),
       hrApi.searchLifecycleEmployees(),
@@ -347,6 +425,27 @@ export const HrReportsPage: React.FC = () => {
     ? (last3Reports.reduce((sum, r) => sum + r.finalScore, 0) / last3Reports.length).toFixed(2)
     : null;
 
+  const filteredCycleEmployees = (cycleOverallData?.employees || []).filter((emp) => {
+    const q = cycleSearchTerm.toLowerCase().trim();
+    const matchesSearch =
+      !q ||
+      (emp.name && emp.name.toLowerCase().includes(q)) ||
+      (emp.employeeCode && emp.employeeCode.toLowerCase().includes(q)) ||
+      (emp.department && emp.department.toLowerCase().includes(q)) ||
+      (emp.designation && emp.designation.toLowerCase().includes(q)) ||
+      (emp.managerName && emp.managerName.toLowerCase().includes(q));
+
+    const isFin = emp.status === 'COMPLETED' || emp.status === 'FINAL_RESULT_PUBLISHED';
+    const matchesStatus =
+      cycleStatusFilter === 'ALL'
+        ? true
+        : cycleStatusFilter === 'COMPLETED'
+        ? isFin
+        : !isFin;
+
+    return matchesSearch && matchesStatus;
+  });
+
   return (
     <div className="space-y-8 animate-fadeIn">
       {/* Top Header & Tab Switcher */}
@@ -365,12 +464,23 @@ export const HrReportsPage: React.FC = () => {
           </div>
           <h2 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">Appraisal & Rating Reports</h2>
           <p className="text-xs md:text-sm text-slate-500 mt-1 max-w-xl">
-            Switch between company-wide performance tracking and your own personal appraisal score history.
+            View consolidated cycle reports for all employees, drill down into individual evaluations, or review your own scores.
           </p>
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200/80 shrink-0">
+        <div className="flex flex-wrap bg-slate-100 p-1.5 rounded-2xl border border-slate-200/80 shrink-0 gap-1">
+          <button
+            onClick={() => setActiveTab('OVERALL')}
+            className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              activeTab === 'OVERALL'
+                ? 'bg-pms-green text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Layers size={16} />
+            <span>Overall PMS Cycle Report</span>
+          </button>
           <button
             onClick={() => setActiveTab('CORPORATE')}
             className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
@@ -380,7 +490,7 @@ export const HrReportsPage: React.FC = () => {
             }`}
           >
             <Users size={16} />
-            <span>Company Reports</span>
+            <span>Individual Employee Reports</span>
           </button>
           <button
             onClick={() => setActiveTab('SELF')}
@@ -403,8 +513,289 @@ export const HrReportsPage: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 1: MY PERSONAL RATINGS & REPORTS */}
-      {activeTab === 'SELF' ? (
+      {/* TAB 1: OVERALL PMS CYCLE REPORT (ALL EMPLOYEES) */}
+      {activeTab === 'OVERALL' ? (
+        <div className="space-y-6">
+          {/* Top Control Bar: PMS Cycle Selector & Instant Download Buttons */}
+          <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold border border-emerald-200/60 shadow-inner shrink-0">
+                  <Calendar size={22} />
+                </div>
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Select PMS Appraisal Cycle</span>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <select
+                      value={cycleOverallMonth}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCycleOverallMonth(val);
+                        fetchCycleOverallReport(val);
+                      }}
+                      className="px-3.5 py-2 text-sm font-bold bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-pms-green transition-all"
+                    >
+                      <option value="ALL">🌟 All PMS Cycles (Consolidated)</option>
+                      {(cycleOverallData?.availableCycles || []).map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Export / Download Buttons */}
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => handleDownloadCycleReport('excel')}
+                disabled={downloadingCycle}
+                className="flex items-center space-x-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
+              >
+                <FileSpreadsheet size={16} />
+                <span>{downloadingCycle ? 'Generating Excel...' : 'Download Excel Report'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDownloadCycleReport('pdf')}
+                disabled={downloadingCycle}
+                className="flex items-center space-x-2 px-5 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
+              >
+                <Download size={16} />
+                <span>{downloadingCycle ? 'Generating PDF...' : 'Download PDF Report'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Metric KPI Overview Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Total Employees</span>
+                <span className="text-2xl font-black text-slate-800 mt-1 block">
+                  {cycleOverallData?.totalEmployees ?? 0}
+                </span>
+                <span className="text-[10px] text-slate-500 font-medium">Assigned in {cycleOverallMonth === 'ALL' ? 'All Cycles' : cycleOverallMonth}</span>
+              </div>
+              <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <Users size={20} />
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Completed / Finalized</span>
+                <span className="text-2xl font-black text-emerald-600 mt-1 block">
+                  {cycleOverallData?.completedCount ?? 0}
+                </span>
+                <span className="text-[10px] text-slate-500 font-medium">
+                  {cycleOverallData?.totalEmployees ? Math.round(((cycleOverallData.completedCount || 0) / cycleOverallData.totalEmployees) * 100) : 0}% completion rate
+                </span>
+              </div>
+              <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <CheckCircle2 size={20} />
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">In Progress / Pending</span>
+                <span className="text-2xl font-black text-amber-600 mt-1 block">
+                  {cycleOverallData?.inProgressCount ?? 0}
+                </span>
+                <span className="text-[10px] text-slate-500 font-medium">Under manager or HR review</span>
+              </div>
+              <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                <AlertCircle size={20} />
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Cycle Average Score</span>
+                <div className="flex items-baseline space-x-1 mt-1">
+                  <span className="text-2xl font-black text-pms-darkGreen">
+                    {cycleOverallData?.averageScore !== null && cycleOverallData?.averageScore !== undefined ? cycleOverallData.averageScore.toFixed(2) : '-'}
+                  </span>
+                  <span className="text-xs text-slate-400 font-bold">/ 5.00</span>
+                </div>
+                <span className="text-[10px] text-slate-500 font-medium">Average across finalized</span>
+              </div>
+              <div className="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                <Award size={20} />
+              </div>
+            </div>
+          </div>
+
+          {/* Search, Filter, and Comprehensive Employees Performance Table */}
+          <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-xs space-y-5">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+              <div>
+                <h3 className="text-base font-bold text-slate-800 flex items-center space-x-2">
+                  <FileText size={18} className="text-pms-green" />
+                  <span>Employee Appraisal Performance Register</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Complete register of all assigned employees, performance grades, manager reviews, and final results for {cycleOverallMonth === 'ALL' ? 'all cycles' : cycleOverallMonth}.
+                </p>
+              </div>
+
+              {/* Filter controls */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="relative">
+                  <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={cycleSearchTerm}
+                    onChange={(e) => setCycleSearchTerm(e.target.value)}
+                    placeholder="Search name, code, dept..."
+                    className="pl-9 pr-3.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-pms-green transition-all w-52"
+                  />
+                  {cycleSearchTerm && (
+                    <button
+                      onClick={() => setCycleSearchTerm('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-bold">
+                  <button
+                    onClick={() => setCycleStatusFilter('ALL')}
+                    className={`px-3 py-1 rounded-lg transition-all ${
+                      cycleStatusFilter === 'ALL' ? 'bg-white text-slate-800 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    All ({cycleOverallData?.employees?.length ?? 0})
+                  </button>
+                  <button
+                    onClick={() => setCycleStatusFilter('COMPLETED')}
+                    className={`px-3 py-1 rounded-lg transition-all ${
+                      cycleStatusFilter === 'COMPLETED' ? 'bg-white text-emerald-700 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    Finalized ({cycleOverallData?.completedCount ?? 0})
+                  </button>
+                  <button
+                    onClick={() => setCycleStatusFilter('IN_PROGRESS')}
+                    className={`px-3 py-1 rounded-lg transition-all ${
+                      cycleStatusFilter === 'IN_PROGRESS' ? 'bg-white text-amber-700 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    In Progress ({cycleOverallData?.inProgressCount ?? 0})
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Table */}
+            {loadingCycleReport ? (
+              <div className="py-12 text-center text-xs text-slate-400">Loading cycle report data...</div>
+            ) : filteredCycleEmployees.length === 0 ? (
+              <div className="py-12 text-center text-xs text-slate-500 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                No employee records found matching your filter criteria.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-150 text-left">
+                  <thead className="bg-slate-50/70">
+                    <tr>
+                      <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">#</th>
+                      <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Employee</th>
+                      <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Department & Role</th>
+                      <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Reporting Manager</th>
+                      <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">PMS Cycle</th>
+                      <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Final Score</th>
+                      <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Performance Grade</th>
+                      <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                      <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs">
+                    {filteredCycleEmployees.map((emp, idx) => {
+                      const isFin = emp.status === 'COMPLETED' || emp.status === 'FINAL_RESULT_PUBLISHED';
+                      return (
+                        <tr key={emp.assignmentId} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="px-4 py-3.5 text-slate-400 font-bold">{idx + 1}</td>
+                          <td className="px-4 py-3.5">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-black text-slate-600 text-xs overflow-hidden shrink-0">
+                                {emp.profilePhoto ? (
+                                  <img src={emp.profilePhoto} alt={emp.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  emp.name.charAt(0)
+                                )}
+                              </div>
+                              <div>
+                                <span className="font-bold text-slate-800 block">{emp.name}</span>
+                                <span className="text-[10px] text-slate-400 font-medium">{emp.employeeCode}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <span className="font-semibold text-slate-700 block">{emp.designation}</span>
+                            <span className="text-[10px] text-slate-400">{emp.department}</span>
+                          </td>
+                          <td className="px-4 py-3.5 text-slate-600 font-medium">{emp.managerName}</td>
+                          <td className="px-4 py-3.5">
+                            <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                              {emp.cycleMonth}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5">
+                            {emp.overallScore != null ? (
+                              <div className="flex items-center space-x-2">
+                                <span className="font-black text-sm text-emerald-700">{emp.overallScore.toFixed(2)}</span>
+                                <span className="text-[10px] text-slate-400">/ 5.0</span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 font-medium italic">Pending</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5">
+                            {emp.performanceGrade && emp.performanceGrade !== '-' ? (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200 inline-block">
+                                {emp.performanceGrade}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border inline-block ${
+                              isFin
+                                ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                : emp.status.includes('MANAGER')
+                                ? 'bg-blue-100 text-blue-800 border-blue-300'
+                                : 'bg-amber-100 text-amber-800 border-amber-300'
+                            }`}>
+                              {isFin ? 'Finalized' : emp.status.replace(/_/g, ' ')}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleViewEmployeeLifecycle(emp.employeeId, emp.cycleMonth)}
+                              className="px-3 py-1.5 text-xs font-bold text-pms-green hover:text-white hover:bg-pms-green border border-pms-green/40 hover:border-pms-green rounded-xl transition-all cursor-pointer inline-flex items-center space-x-1 shadow-2xs"
+                              title="View full lifecycle & detailed report"
+                            >
+                              <Eye size={13} />
+                              <span>View Detail</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : activeTab === 'SELF' ? (
         <div className="space-y-6">
           {myHistoryList.length === 0 ? (
             <div className="bg-white border border-slate-200/80 rounded-3xl p-12 text-center shadow-xs">

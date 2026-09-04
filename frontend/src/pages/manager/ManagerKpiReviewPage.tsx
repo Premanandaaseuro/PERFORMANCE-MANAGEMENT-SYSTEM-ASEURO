@@ -22,6 +22,7 @@ const isHrStandardKpiName = (name: string): boolean => {
   if (!name) return false;
   const n = name.trim().toLowerCase();
   return (
+    n.includes('hr assessment') ||
     n.includes('(hr assessment)') ||
     n.includes('(hr parameter)') ||
     n.includes('(hr rating)') ||
@@ -107,12 +108,13 @@ export const ManagerKpiReviewPage: React.FC = () => {
   const handleSubmitReview = async () => {
     if (!reviewData) return;
 
-    // Mandatory Validation: All manager ratings must be between 1.0 and 5.0 (cannot be empty, null, or 0)
-    for (const k of reviewData.kpis) {
+    // Mandatory Validation: All manager-required ratings (excluding HR-exclusive parameters) must be between 1.0 and 5.0
+    const managerKpis = (reviewData.kpis || []).filter(k => !isHrStandardKpiName(k.kpiName));
+    for (const k of managerKpis) {
       const entry = managerRatings[k.kpiId];
       const ratingNum = typeof entry?.rating === 'number' ? entry.rating : (entry?.rating ? Number(entry.rating) : null);
       if (ratingNum === null || isNaN(ratingNum) || ratingNum < 1.0 || ratingNum > 5.0) {
-        setError(`All KPI ratings are mandatory (scale 1.0 to 5.0). Rating for "${k.kpiName}" cannot be empty or 0.`);
+        setError(`Rating for "${k.kpiName}" is mandatory (scale 1.0 to 5.0). 0 or empty is not allowed.`);
         return;
       }
     }
@@ -128,10 +130,11 @@ export const ManagerKpiReviewPage: React.FC = () => {
       const payload = {
         ratings: reviewData.kpis.map(k => {
           const entry = managerRatings[k.kpiId];
-          const ratingNum = typeof entry?.rating === 'number' ? entry.rating : (Number(entry?.rating) || 0);
+          const isHrKpi = isHrStandardKpiName(k.kpiName);
+          const ratingNum = typeof entry?.rating === 'number' ? entry.rating : (entry?.rating ? Number(entry.rating) : null);
           return {
             kpiId: k.kpiId,
-            managerRating: ratingNum,
+            managerRating: isHrKpi ? null : (ratingNum !== null && !isNaN(ratingNum) ? ratingNum : null),
             managerComments: entry?.comments || ''
           };
         }),

@@ -543,4 +543,209 @@ public class ReportService {
             return baos.toByteArray();
         }
     }
+
+    @Transactional(readOnly = true)
+    public byte[] generateCycleExcelReport(String cycleMonth) throws IOException {
+        List<PmsAssignment> assignments;
+        if (cycleMonth != null && !cycleMonth.trim().isEmpty() && !cycleMonth.equalsIgnoreCase("ALL")) {
+            assignments = pmsAssignmentRepository.findByCycleMonthIgnoreCase(cycleMonth.trim());
+        } else {
+            assignments = pmsAssignmentRepository.findAll();
+        }
+        assignments.sort((a, b) -> Long.compare(b.getId(), a.getId()));
+
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Overall PMS Report");
+
+            // Header Style
+            CellStyle headerStyle = workbook.createCellStyle();
+            headerStyle.setFillForegroundColor(IndexedColors.DARK_GREEN.getIndex());
+            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            org.apache.poi.ss.usermodel.Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerFont.setColor(IndexedColors.WHITE.getIndex());
+            headerFont.setFontHeightInPoints((short) 10);
+            headerStyle.setFont(headerFont);
+            headerStyle.setAlignment(HorizontalAlignment.CENTER);
+
+            // Title Row
+            Row titleRow = sheet.createRow(0);
+            Cell titleCell = titleRow.createCell(0);
+            titleCell.setCellValue("ASEURO PERFORMANCE MANAGEMENT SYSTEM - OVERALL PMS CYCLE REPORT: " + (cycleMonth != null && !cycleMonth.trim().isEmpty() ? cycleMonth : "ALL CYCLES"));
+            CellStyle titleStyle = workbook.createCellStyle();
+            org.apache.poi.ss.usermodel.Font titleFont = workbook.createFont();
+            titleFont.setBold(true);
+            titleFont.setFontHeightInPoints((short) 13);
+            titleFont.setColor(IndexedColors.DARK_GREEN.getIndex());
+            titleStyle.setFont(titleFont);
+            titleCell.setCellStyle(titleStyle);
+
+            Row subRow = sheet.createRow(1);
+            subRow.createCell(0).setCellValue("Report Generated: " + java.time.LocalDate.now() + " | Total Employees: " + assignments.size());
+
+            String[] columns = {"#", "Emp Code", "Employee Name", "Designation", "Department", "Reporting Manager", "PMS Cycle", "Status", "Final Score", "Grade", "Finalized Date"};
+
+            Row headerRow = sheet.createRow(3);
+            for (int i = 0; i < columns.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(columns[i]);
+                cell.setCellStyle(headerStyle);
+            }
+
+            int rowNum = 4;
+            int idx = 1;
+            for (PmsAssignment a : assignments) {
+                Employee emp = a.getEmployee();
+                Row row = sheet.createRow(rowNum++);
+                row.createCell(0).setCellValue(idx++);
+                row.createCell(1).setCellValue(emp != null && emp.getEmployeeCode() != null ? emp.getEmployeeCode() : (emp != null ? "EMP-" + emp.getId() : "-"));
+                row.createCell(2).setCellValue(emp != null ? emp.getName() : "Unknown");
+                row.createCell(3).setCellValue(emp != null && emp.getDesignation() != null ? emp.getDesignation() : "-");
+                row.createCell(4).setCellValue(emp != null && emp.getDepartment() != null ? emp.getDepartment() : "-");
+                row.createCell(5).setCellValue(emp != null && emp.getManager() != null ? emp.getManager().getName() : "-");
+                row.createCell(6).setCellValue(a.getCycleMonth() != null ? a.getCycleMonth() : "-");
+                row.createCell(7).setCellValue(a.getStatus().name());
+                if (a.getOverallScore() != null) {
+                    row.createCell(8).setCellValue(a.getOverallScore());
+                } else {
+                    row.createCell(8).setCellValue("-");
+                }
+                row.createCell(9).setCellValue(a.getPerformanceGrade() != null ? a.getPerformanceGrade() : "-");
+                row.createCell(10).setCellValue(a.getFinalizedDate() != null ? a.getFinalizedDate().toString() : "-");
+            }
+
+            for (int i = 0; i < columns.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            workbook.write(baos);
+            return baos.toByteArray();
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] generateCyclePdfReport(String cycleMonth) throws IOException {
+        List<PmsAssignment> assignments;
+        if (cycleMonth != null && !cycleMonth.trim().isEmpty() && !cycleMonth.equalsIgnoreCase("ALL")) {
+            assignments = pmsAssignmentRepository.findByCycleMonthIgnoreCase(cycleMonth.trim());
+        } else {
+            assignments = pmsAssignmentRepository.findAll();
+        }
+        assignments.sort((a, b) -> Long.compare(b.getId(), a.getId()));
+
+        try (PDDocument document = new PDDocument()) {
+            PDType1Font fontBold = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
+            PDType1Font fontRegular = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
+
+            Color brightGreen = new Color(111, 192, 74);
+            Color darkGray = new Color(58, 58, 58);
+            Color darkGreen = new Color(74, 118, 55);
+            Color lightRowBg = new Color(244, 249, 241);
+            Color borderLightColor = new Color(220, 230, 215);
+            Color textColor = new Color(51, 65, 85);
+
+            PDPage page = new PDPage(PDRectangle.A4);
+            document.addPage(page);
+            PDPageContentStream contentStream = new PDPageContentStream(document, page);
+
+            float margin = 35;
+            float pageHeight = PDRectangle.A4.getHeight();
+            float pageWidth = PDRectangle.A4.getWidth();
+            float usableWidth = pageWidth - (margin * 2);
+
+            float y = pageHeight - margin;
+
+            byte[] logoBytes = loadLogoBytes();
+            if (logoBytes != null && logoBytes.length > 0) {
+                try {
+                    PDImageXObject pdLogo = PDImageXObject.createFromByteArray(document, logoBytes, "aseuro-logo");
+                    contentStream.drawImage(pdLogo, margin, y - 40, 38, 38);
+                } catch (Exception ignored) {}
+            }
+
+            drawCellText(contentStream, "ASEURO TECHNOLOGIES PRIVATE LIMITED", fontBold, 13f, margin + 48, y - 16, darkGray);
+            drawCellText(contentStream, "OVERALL EMPLOYEE PMS CYCLE REPORT • " + (cycleMonth != null && !cycleMonth.trim().isEmpty() ? cycleMonth : "ALL CYCLES"), fontBold, 9.5f, margin + 48, y - 29, darkGreen);
+            drawCellText(contentStream, "Generated on: " + java.time.LocalDate.now() + " | Total Records: " + assignments.size(), fontRegular, 8f, margin + 48, y - 40, textColor);
+
+            y -= 55;
+
+            contentStream.setStrokingColor(brightGreen);
+            contentStream.setLineWidth(1.5f);
+            contentStream.moveTo(margin, y);
+            contentStream.lineTo(pageWidth - margin, y);
+            contentStream.stroke();
+
+            y -= 20;
+
+            float[] colWidths = {22, 50, 115, 85, 95, 45, 60, 53};
+            String[] headers = {"#", "Code", "Employee Name", "Department", "Manager", "Score", "Grade", "Status"};
+
+            y = drawTableHeader(contentStream, margin, y, colWidths, headers, fontBold, darkGray, brightGreen);
+
+            int idx = 1;
+            for (PmsAssignment a : assignments) {
+                if (y < margin + 45) {
+                    contentStream.close();
+                    page = new PDPage(PDRectangle.A4);
+                    document.addPage(page);
+                    contentStream = new PDPageContentStream(document, page);
+                    y = pageHeight - margin - 20;
+                    y = drawTableHeader(contentStream, margin, y, colWidths, headers, fontBold, darkGray, brightGreen);
+                }
+
+                Employee emp = a.getEmployee();
+                float rowHeight = 20;
+
+                if (idx % 2 == 0) {
+                    drawFilledRect(contentStream, margin, y - rowHeight, usableWidth, rowHeight, lightRowBg);
+                }
+                drawStrokedRect(contentStream, margin, y - rowHeight, usableWidth, rowHeight, borderLightColor, 0.5f);
+
+                float currentX = margin;
+                drawCellText(contentStream, String.valueOf(idx), fontRegular, 7.5f, currentX + 3, y - 13, darkGray);
+                currentX += colWidths[0];
+
+                drawCellText(contentStream, emp != null && emp.getEmployeeCode() != null ? emp.getEmployeeCode() : (emp != null ? "EMP-" + emp.getId() : "-"), fontRegular, 7.5f, currentX + 3, y - 13, textColor);
+                currentX += colWidths[1];
+
+                String name = emp != null ? emp.getName() : "Unknown";
+                if (name.length() > 22) name = name.substring(0, 20) + "...";
+                drawCellText(contentStream, name, fontBold, 8f, currentX + 3, y - 13, darkGray);
+                currentX += colWidths[2];
+
+                String dept = emp != null && emp.getDepartment() != null ? emp.getDepartment() : "-";
+                if (dept.length() > 16) dept = dept.substring(0, 14) + "...";
+                drawCellText(contentStream, dept, fontRegular, 7.5f, currentX + 3, y - 13, textColor);
+                currentX += colWidths[3];
+
+                String mgr = emp != null && emp.getManager() != null ? emp.getManager().getName() : "-";
+                if (mgr.length() > 18) mgr = mgr.substring(0, 16) + "...";
+                drawCellText(contentStream, mgr, fontRegular, 7.5f, currentX + 3, y - 13, textColor);
+                currentX += colWidths[4];
+
+                String scoreStr = a.getOverallScore() != null ? String.format("%.2f", a.getOverallScore()) : "-";
+                drawCellText(contentStream, scoreStr, fontBold, 8f, currentX + 5, y - 13, darkGreen);
+                currentX += colWidths[5];
+
+                String grade = a.getPerformanceGrade() != null ? a.getPerformanceGrade() : "-";
+                if (grade.length() > 12) grade = grade.substring(0, 10) + "...";
+                drawCellText(contentStream, grade, fontRegular, 7f, currentX + 3, y - 13, textColor);
+                currentX += colWidths[6];
+
+                String st = a.getStatus().name();
+                if (st.equals("COMPLETED")) st = "FINALIZED";
+                else if (st.length() > 11) st = st.substring(0, 9) + "...";
+                drawCellText(contentStream, st, fontRegular, 6.5f, currentX + 3, y - 13, textColor);
+
+                y -= rowHeight;
+                idx++;
+            }
+
+            contentStream.close();
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            document.save(baos);
+            return baos.toByteArray();
+        }
+    }
 }

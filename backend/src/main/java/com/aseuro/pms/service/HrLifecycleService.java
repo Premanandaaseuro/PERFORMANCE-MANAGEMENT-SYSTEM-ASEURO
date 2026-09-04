@@ -237,6 +237,11 @@ public class HrLifecycleService {
         Employee hr = employeeRepository.findById(hrEmployeeId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "HR user not found"));
 
+        PMSState st = assignment.getStatus();
+        if (st == PMSState.PMS_NOT_STARTED || st == PMSState.PMS_STARTED || st == PMSState.SELF_ASSESSMENT_DRAFT || st == PMSState.SELF_ASSESSMENT_SUBMITTED || st == PMSState.MANAGER_REVIEW_PENDING) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Manager review is pending for this employee. HR evaluation and finalization are unlocked only after the reporting manager submits their review.");
+        }
+
         // Save individual HR KPI ratings if provided
         if (request.getKpiRatings() != null && !request.getKpiRatings().isEmpty()) {
             List<PmsKpi> kpis = pmsKpiRepository.findByAssignment(assignment);
@@ -381,6 +386,11 @@ public class HrLifecycleService {
     public Map<String, Object> updateKpiRatingsAndComments(Long assignmentId, HrUpdateKpiRatingsRequest request) {
         PmsAssignment assignment = pmsAssignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "PMS Assignment not found"));
+
+        PMSState st = assignment.getStatus();
+        if (st == PMSState.PMS_NOT_STARTED || st == PMSState.PMS_STARTED || st == PMSState.SELF_ASSESSMENT_DRAFT || st == PMSState.SELF_ASSESSMENT_SUBMITTED || st == PMSState.MANAGER_REVIEW_PENDING) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Manager review is pending for this employee. HR evaluation and finalization are unlocked only after the reporting manager submits their review.");
+        }
 
         if (request.getKpiRatings() == null || request.getKpiRatings().isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "KPI ratings update list cannot be empty.");
@@ -560,6 +570,65 @@ public class HrLifecycleService {
                 .averageScore(total > 0 ? Math.round((sumScores / total) * 100.0) / 100.0 : null)
                 .allEmployees(allCategoryEmployees)
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getCycleOverallReport(String cycleMonth) {
+        List<PmsAssignment> assignments;
+        if (cycleMonth != null && !cycleMonth.trim().isEmpty() && !cycleMonth.equalsIgnoreCase("ALL")) {
+            assignments = pmsAssignmentRepository.findByCycleMonthIgnoreCase(cycleMonth.trim());
+        } else {
+            assignments = pmsAssignmentRepository.findAll();
+        }
+
+        assignments.sort((a, b) -> Long.compare(b.getId(), a.getId()));
+
+        List<Map<String, Object>> employeeList = new ArrayList<>();
+        double totalScores = 0.0;
+        int completedCount = 0;
+        int inProgressCount = 0;
+
+        for (PmsAssignment a : assignments) {
+            Employee emp = a.getEmployee();
+            boolean isFin = a.getStatus() == PMSState.COMPLETED || a.getStatus() == PMSState.FINAL_RESULT_PUBLISHED;
+            if (isFin) {
+                completedCount++;
+                if (a.getOverallScore() != null) {
+                    totalScores += a.getOverallScore();
+                }
+            } else {
+                inProgressCount++;
+            }
+
+            Map<String, Object> row = new HashMap<>();
+            row.put("assignmentId", a.getId());
+            row.put("employeeId", emp != null ? emp.getId() : null);
+            row.put("employeeCode", emp != null && emp.getEmployeeCode() != null ? emp.getEmployeeCode() : (emp != null ? "EMP-" + emp.getId() : "-"));
+            row.put("name", emp != null ? emp.getName() : "Unknown");
+            row.put("designation", emp != null && emp.getDesignation() != null ? emp.getDesignation() : "-");
+            row.put("department", emp != null && emp.getDepartment() != null ? emp.getDepartment() : "-");
+            row.put("managerName", emp != null && emp.getManager() != null ? emp.getManager().getName() : "-");
+            row.put("cycleMonth", a.getCycleMonth() != null ? a.getCycleMonth() : "-");
+            row.put("status", a.getStatus().name());
+            row.put("overallScore", a.getOverallScore());
+            row.put("performanceGrade", a.getPerformanceGrade() != null ? a.getPerformanceGrade() : "-");
+            row.put("finalizedDate", a.getFinalizedDate() != null ? a.getFinalizedDate().toString() : "-");
+            row.put("profilePhoto", emp != null ? emp.getProfilePhoto() : null);
+
+            employeeList.add(row);
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("cycleMonth", (cycleMonth != null && !cycleMonth.trim().isEmpty()) ? cycleMonth.trim() : "All Cycles");
+        result.put("totalEmployees", assignments.size());
+        result.put("completedCount", completedCount);
+        result.put("inProgressCount", inProgressCount);
+        result.put("averageScore", completedCount > 0 ? Math.round((totalScores / completedCount) * 100.0) / 100.0 : null);
+        List<String> allCycles = pmsAssignmentRepository.findDistinctCycleMonths();
+        result.put("availableCycles", allCycles);
+        result.put("employees", employeeList);
+
+        return result;
     }
 
     private List<Map<String, Object>> buildDefaultWorkflowStages(PMSState state) {

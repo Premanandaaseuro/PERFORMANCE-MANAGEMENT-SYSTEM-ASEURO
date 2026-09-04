@@ -320,25 +320,32 @@ public class ManagerService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "PMS has already been finalized by HR and cannot be modified.");
         }
 
-        List<PmsKpi> kpis = pmsKpiRepository.findByAssignment(assignment);
-        if (request.getRatings() == null || request.getRatings().size() != kpis.size()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "All KPI ratings are mandatory (scale 1.0 to 5.0). Empty or 0 ratings are not allowed.");
+        List<PmsKpi> allKpis = pmsKpiRepository.findByAssignment(assignment);
+        List<PmsKpi> managerRequiredKpis = allKpis.stream()
+                .filter(k -> !isHrExclusiveKpi(k.getKpiName()))
+                .collect(Collectors.toList());
+
+        if (request.getRatings() == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Manager ratings submission cannot be empty.");
         }
 
-        // Validate all ratings are between 1.0 and 5.0 (cannot be null, empty, or 0)
-        for (ManagerReviewRequest.ManagerKpiRatingEntry entry : request.getRatings()) {
-            if (entry.getManagerRating() == null || entry.getManagerRating() < 1.0 || entry.getManagerRating() > 5.0) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "All KPI ratings are mandatory and must be between 1.0 and 5.0. Rating cannot be 0 or empty for KPI ID " + entry.getKpiId());
+        // Validate that all manager-required KPIs (excluding HR exclusive parameters) are rated between 1.0 and 5.0
+        for (PmsKpi reqKpi : managerRequiredKpis) {
+            ManagerReviewRequest.ManagerKpiRatingEntry entry = request.getRatings().stream()
+                    .filter(e -> reqKpi.getId().equals(e.getKpiId()))
+                    .findFirst().orElse(null);
+            if (entry == null || entry.getManagerRating() == null || entry.getManagerRating() < 1.0 || entry.getManagerRating() > 5.0) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Rating for KPI '" + reqKpi.getKpiName() + "' is mandatory and must be between 1.0 and 5.0. 0 or empty is not allowed.");
             }
         }
 
         List<EmployeeKpiRating> existingRatings = employeeKpiRatingRepository.findByAssignment(assignment);
 
         for (ManagerReviewRequest.ManagerKpiRatingEntry entry : request.getRatings()) {
-            PmsKpi matchedKpi = kpis.stream()
+            PmsKpi matchedKpi = allKpis.stream()
                     .filter(k -> k.getId().equals(entry.getKpiId()))
-                    .findFirst()
-                    .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "Invalid KPI ID " + entry.getKpiId()));
+                    .findFirst().orElse(null);
+            if (matchedKpi == null) continue;
 
             EmployeeKpiRating rating = existingRatings.stream()
                     .filter(r -> r.getKpi().getId().equals(entry.getKpiId()))
@@ -422,5 +429,16 @@ public class ManagerService {
                 .managerReviewCompletedCount(mgrCompleted)
                 .finalizedRecordsCount(finalized)
                 .build();
+    }
+
+    private boolean isHrExclusiveKpi(String kpiName) {
+        if (kpiName == null) return false;
+        String lower = kpiName.toLowerCase().trim();
+        return lower.contains("hr assessment") ||
+               lower.contains("(hr assessment)") ||
+               lower.contains("(hr parameter)") ||
+               lower.contains("(hr rating)") ||
+               lower.contains("[hr]") ||
+               lower.contains("• hr parameter");
     }
 }
