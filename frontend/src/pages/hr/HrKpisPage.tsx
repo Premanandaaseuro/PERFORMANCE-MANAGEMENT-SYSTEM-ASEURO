@@ -114,11 +114,15 @@ export const HrKpisPage: React.FC = () => {
   const totalWeightage = kpis.reduce((sum, k) => sum + k.weightage, 0);
 
   const isHrRatingKpiName = (name: string) => {
-    const lower = name.toLowerCase();
-    return lower.includes('hr assessment') || lower.includes('hr rating') ||
-           lower.includes('leave pattern') || lower.includes('team collaboration') ||
-           lower.includes('punctuality') || lower.includes('new initiatives') ||
-           lower.includes('rewards');
+    if (!name) return false;
+    const lower = name.toLowerCase().trim();
+    return (
+      lower.includes('(hr assessment)') ||
+      lower.includes('(hr parameter)') ||
+      lower.includes('(hr rating)') ||
+      lower.includes('[hr]') ||
+      lower.includes('• hr parameter')
+    );
   };
 
   const hrRatingWeight = kpis.filter(k => isHrRatingKpiName(k.kpiName)).reduce((sum, k) => sum + k.weightage, 0);
@@ -212,12 +216,19 @@ export const HrKpisPage: React.FC = () => {
   const openEditModal = (kpi: KpiMasterItem) => {
     setModalMode('edit');
     setCurrentKpiId(kpi.id);
-    setFormKpiName(kpi.kpiName);
+    const isHr = isHrRatingKpiName(kpi.kpiName);
+    const cleanName = kpi.kpiName
+      .replace(/\s*\(HR Assessment\)/gi, '')
+      .replace(/\s*\(HR Parameter\)/gi, '')
+      .replace(/\s*\(HR Rating\)/gi, '')
+      .replace(/\s*\[HR\]/gi, '')
+      .trim();
+    setFormKpiName(cleanName);
     setFormDescription(kpi.description || '');
     setFormWeightage(kpi.weightage);
     setFormSelfRatingScale(kpi.selfRatingScale || '1.0 - 5.0 Rating Scale');
     setFormManagerRatingScale(kpi.managerRatingScale || '1.0 - 5.0 Rating Scale');
-    setFormKpiCategory(isHrRatingKpiName(kpi.kpiName) ? 'HR' : 'REGULAR');
+    setFormKpiCategory(isHr ? 'HR' : 'REGULAR');
     setFormError(null);
     setModalOpen(true);
   };
@@ -238,12 +249,21 @@ export const HrKpisPage: React.FC = () => {
     }
 
     let finalKpiName = formKpiName.trim();
-    if (formKpiCategory === 'HR' && !isHrRatingKpiName(finalKpiName)) {
-      finalKpiName = `${finalKpiName} (HR Assessment)`;
+    if (formKpiCategory === 'HR') {
+      if (!isHrRatingKpiName(finalKpiName)) {
+        finalKpiName = `${finalKpiName} (HR Assessment)`;
+      }
+    } else {
+      finalKpiName = finalKpiName
+        .replace(/\s*\(HR Assessment\)/gi, '')
+        .replace(/\s*\(HR Parameter\)/gi, '')
+        .replace(/\s*\(HR Rating\)/gi, '')
+        .replace(/\s*\[HR\]/gi, '')
+        .trim();
     }
 
     // Validate 75% non-HR weightage limit and 25% HR weightage limit
-    const isHrParam = formKpiCategory === 'HR' || isHrRatingKpiName(finalKpiName);
+    const isHrParam = formKpiCategory === 'HR';
 
     const nonHrKpis = kpis.filter(k => !isHrRatingKpiName(k.kpiName) && (modalMode === 'create' || k.id !== currentKpiId));
     const otherNonHrWeight = nonHrKpis.reduce((sum, k) => sum + k.weightage, 0);

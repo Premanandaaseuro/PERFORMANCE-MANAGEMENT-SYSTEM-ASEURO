@@ -63,10 +63,12 @@ export interface User {
   name: string;
   role: string;
   profilePhoto?: string;
+  mustChangePassword?: boolean;
 }
 
 export interface Employee {
   id: number;
+  employeeCode?: string;
   name: string;
   email: string;
   department: string;
@@ -214,16 +216,33 @@ export interface EmployeeLifecycleData {
   }>;
 }
 
+export interface CategoryEmployee {
+  id: number;
+  employeeId?: number;
+  employeeCode?: string;
+  name: string;
+  designation: string;
+  department: string;
+  managerName?: string;
+  finalScore: number;
+  grade: string;
+  cycleMonth: string;
+  assignmentId?: number;
+  profilePhoto?: string;
+}
+
 export interface RatingCategoryItem {
   category: string;
   count: number;
   percentage: number;
+  employees?: CategoryEmployee[];
 }
 
 export interface HrReportSummary {
   categories: RatingCategoryItem[];
   totalFinalizedRecords: number;
   averageScore: number | null;
+  allEmployees?: CategoryEmployee[];
 }
 
 export interface CreateEmployeePayload {

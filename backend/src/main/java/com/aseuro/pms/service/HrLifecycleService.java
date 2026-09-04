@@ -429,37 +429,64 @@ public class HrLifecycleService {
     public HrReportSummaryDto getRatingCategorySummary() {
         List<PmsHistory> allHistory = pmsHistoryRepository.findAll();
 
-        long excellentCount = 0;
-        long veryGoodCount = 0;
-        long goodCount = 0;
-        long needsImpCount = 0;
-        long poorCount = 0;
+        List<HrReportSummaryDto.CategoryEmployeeDto> excellentEmployees = new ArrayList<>();
+        List<HrReportSummaryDto.CategoryEmployeeDto> veryGoodEmployees = new ArrayList<>();
+        List<HrReportSummaryDto.CategoryEmployeeDto> goodEmployees = new ArrayList<>();
+        List<HrReportSummaryDto.CategoryEmployeeDto> needsImpEmployees = new ArrayList<>();
+        List<HrReportSummaryDto.CategoryEmployeeDto> poorEmployees = new ArrayList<>();
+        List<HrReportSummaryDto.CategoryEmployeeDto> allCategoryEmployees = new ArrayList<>();
 
         double sumScores = 0.0;
 
         for (PmsHistory h : allHistory) {
             double score = h.getFinalScore() != null ? h.getFinalScore() : 0.0;
             sumScores += score;
-            if (score >= 4.2) excellentCount++;
-            else if (score >= 3.8) veryGoodCount++;
-            else if (score >= 3.0) goodCount++;
-            else if (score >= 2.0) needsImpCount++;
-            else poorCount++;
+
+            Employee emp = h.getEmployee();
+            HrReportSummaryDto.CategoryEmployeeDto empDto = HrReportSummaryDto.CategoryEmployeeDto.builder()
+                    .id(h.getId())
+                    .employeeId(emp != null ? emp.getId() : null)
+                    .employeeCode(emp != null && emp.getEmployeeCode() != null ? emp.getEmployeeCode() : (emp != null ? "EMP-" + emp.getId() : ""))
+                    .name(emp != null ? emp.getName() : "Unknown")
+                    .designation(emp != null && emp.getDesignation() != null ? emp.getDesignation() : "-")
+                    .department(emp != null && emp.getDepartment() != null ? emp.getDepartment() : "-")
+                    .managerName(emp != null && emp.getManager() != null ? emp.getManager().getName() : "N/A")
+                    .finalScore(score)
+                    .grade(h.getGrade())
+                    .cycleMonth(h.getCycleMonth())
+                    .assignmentId(h.getAssignmentId())
+                    .profilePhoto(emp != null ? emp.getProfilePhoto() : null)
+                    .build();
+
+            allCategoryEmployees.add(empDto);
+
+            if (score >= 4.2) {
+                excellentEmployees.add(empDto);
+            } else if (score >= 3.8) {
+                veryGoodEmployees.add(empDto);
+            } else if (score >= 3.0) {
+                goodEmployees.add(empDto);
+            } else if (score >= 2.0) {
+                needsImpEmployees.add(empDto);
+            } else {
+                poorEmployees.add(empDto);
+            }
         }
 
         long total = allHistory.size();
         List<HrReportSummaryDto.RatingCategoryDto> cats = new ArrayList<>();
 
-        cats.add(new HrReportSummaryDto.RatingCategoryDto("Excellent", excellentCount, total > 0 ? Math.round((excellentCount * 100.0 / total) * 10.0) / 10.0 : 0.0));
-        cats.add(new HrReportSummaryDto.RatingCategoryDto("Very Good", veryGoodCount, total > 0 ? Math.round((veryGoodCount * 100.0 / total) * 10.0) / 10.0 : 0.0));
-        cats.add(new HrReportSummaryDto.RatingCategoryDto("Good", goodCount, total > 0 ? Math.round((goodCount * 100.0 / total) * 10.0) / 10.0 : 0.0));
-        cats.add(new HrReportSummaryDto.RatingCategoryDto("Needs Improvement", needsImpCount, total > 0 ? Math.round((needsImpCount * 100.0 / total) * 10.0) / 10.0 : 0.0));
-        cats.add(new HrReportSummaryDto.RatingCategoryDto("Poor", poorCount, total > 0 ? Math.round((poorCount * 100.0 / total) * 10.0) / 10.0 : 0.0));
+        cats.add(new HrReportSummaryDto.RatingCategoryDto("Excellent", excellentEmployees.size(), total > 0 ? Math.round((excellentEmployees.size() * 100.0 / total) * 10.0) / 10.0 : 0.0, excellentEmployees));
+        cats.add(new HrReportSummaryDto.RatingCategoryDto("Very Good", veryGoodEmployees.size(), total > 0 ? Math.round((veryGoodEmployees.size() * 100.0 / total) * 10.0) / 10.0 : 0.0, veryGoodEmployees));
+        cats.add(new HrReportSummaryDto.RatingCategoryDto("Good", goodEmployees.size(), total > 0 ? Math.round((goodEmployees.size() * 100.0 / total) * 10.0) / 10.0 : 0.0, goodEmployees));
+        cats.add(new HrReportSummaryDto.RatingCategoryDto("Needs Improvement", needsImpEmployees.size(), total > 0 ? Math.round((needsImpEmployees.size() * 100.0 / total) * 10.0) / 10.0 : 0.0, needsImpEmployees));
+        cats.add(new HrReportSummaryDto.RatingCategoryDto("Poor", poorEmployees.size(), total > 0 ? Math.round((poorEmployees.size() * 100.0 / total) * 10.0) / 10.0 : 0.0, poorEmployees));
 
         return HrReportSummaryDto.builder()
                 .categories(cats)
                 .totalFinalizedRecords(total)
                 .averageScore(total > 0 ? Math.round((sumScores / total) * 100.0) / 100.0 : null)
+                .allEmployees(allCategoryEmployees)
                 .build();
     }
 

@@ -22,11 +22,11 @@ const isHrStandardKpiName = (name: string): boolean => {
   if (!name) return false;
   const n = name.trim().toLowerCase();
   return (
-    n.includes('leave pattern') ||
-    n.includes('team collaboration') ||
-    n.includes('punctuality') ||
-    n.includes('new initiatives') ||
-    n.includes('rewards')
+    n.includes('(hr assessment)') ||
+    n.includes('(hr parameter)') ||
+    n.includes('(hr rating)') ||
+    n.includes('[hr]') ||
+    n.includes('• hr parameter')
   );
 };
 

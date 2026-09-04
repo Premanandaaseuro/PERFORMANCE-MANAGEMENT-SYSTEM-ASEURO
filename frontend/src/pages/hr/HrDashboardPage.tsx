@@ -90,8 +90,8 @@ export const HrDashboardPage: React.FC = () => {
     return (
       <div className="space-y-6">
         <div className="h-8 bg-slate-200 rounded w-1/3 skeleton-shimmer"></div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {[1, 2, 3, 4].map(i => (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[1, 2, 3].map(i => (
             <div key={i} className="bg-white p-6 rounded-xl border border-slate-150 h-32 space-y-3">
               <div className="h-4 bg-slate-200 rounded w-2/3 skeleton-shimmer"></div>
               <div className="h-8 bg-slate-200 rounded w-1/2 skeleton-shimmer"></div>
@@ -143,7 +143,7 @@ export const HrDashboardPage: React.FC = () => {
       )}
 
       {/* Summary KPI Stats Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Total Employees */}
         <div
           onClick={() => navigate('/hr/employees')}
@@ -187,21 +187,6 @@ export const HrDashboardPage: React.FC = () => {
           </div>
           <h3 className="text-3xl font-extrabold text-pms-gray mt-2">{stats?.totalDesignations || 0}</h3>
           <p className="text-xs text-blue-600 font-semibold mt-1">Mapped KPI Templates</p>
-        </div>
-
-        {/* Finalized Cycles */}
-        <div
-          onClick={() => navigate('/hr/reports')}
-          className="bg-white p-6 rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-md transition-all cursor-pointer group"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Finalized Records</span>
-            <div className="p-2.5 rounded-xl bg-slate-50 text-slate-600 group-hover:bg-amber-50 group-hover:text-amber-700 transition-colors">
-              <Award size={20} />
-            </div>
-          </div>
-          <h3 className="text-3xl font-extrabold text-pms-gray mt-2">{stats?.completedCycles || 0}</h3>
-          <p className="text-xs text-amber-600 font-semibold mt-1">Published Appraisals</p>
         </div>
       </div>
 

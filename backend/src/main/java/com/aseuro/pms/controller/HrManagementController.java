@@ -330,6 +330,7 @@ public class HrManagementController {
                 .joiningDate(request.getJoiningDate() != null ? request.getJoiningDate() : LocalDate.now())
                 .accountStatus("ACTIVE")
                 .role(role)
+                .mustChangePassword(role == Role.ROLE_EMPLOYEE)
                 .build();
 
         Employee saved = employeeRepository.save(employee);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { authApi } from '../api/authApi';
 import aseuroLogo from '../assets/aseuro-logo.png';
@@ -21,10 +21,12 @@ import {
 export const Login: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetSuccessMessage, setResetSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   // Lockout State (5 failed attempts -> 5 minutes lock)
@@ -50,6 +52,16 @@ export const Login: React.FC = () => {
       }
     }
   }, []);
+
+  useEffect(() => {
+    if (location.state && (location.state as any).resetSuccess) {
+      const st = location.state as any;
+      setResetSuccessMessage(st.message || 'Password reset successfully! Please log in with your new password.');
+      if (st.email) {
+        setEmail(st.email);
+      }
+    }
+  }, [location.state]);
 
   useEffect(() => {
     if (lockSecondsRemaining <= 0) return;
@@ -304,6 +316,14 @@ export const Login: React.FC = () => {
 
             {/* Form */}
             <form className="w-full space-y-4" onSubmit={handleSubmit}>
+              {/* Password Reset Success Banner */}
+              {resetSuccessMessage && (
+                <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-300 flex items-start space-x-2.5 text-emerald-800 animate-fadeIn">
+                  <CheckCircle2 size={18} className="text-emerald-600 shrink-0 mt-0.5" />
+                  <span className="text-xs sm:text-sm font-semibold leading-snug">{resetSuccessMessage}</span>
+                </div>
+              )}
+
               {/* Lock Countdown Banner */}
               {lockSecondsRemaining > 0 && (
                 <div className="p-4 rounded-2xl bg-amber-50 border border-amber-300 flex flex-col items-center justify-center space-y-2 text-amber-900 animate-fadeIn">

@@ -23,5 +23,13 @@ export const authApi = {
   resetLockout: async (email: string): Promise<{ message: string }> => {
     const response = await apiClient.post<{ message: string }>('/auth/reset-lockout', { email });
     return response.data;
+  },
+  changePassword: async (currentPassword: string, newPassword: string, confirmPassword?: string): Promise<{ message: string; mustChangePassword?: boolean }> => {
+    const response = await apiClient.post<{ message: string; mustChangePassword?: boolean }>('/auth/change-password', {
+      currentPassword,
+      newPassword,
+      confirmPassword
+    });
+    return response.data;
   }
 };

@@ -52,4 +52,12 @@ public class Employee {
     private Integer failedAttempts = 0;
 
     private java.time.LocalDateTime lockedUntil;
+
+    @Builder.Default
+    @Column(name = "must_change_password")
+    private Boolean mustChangePassword = false;
+
+    public Boolean getMustChangePassword() {
+        return mustChangePassword != null ? mustChangePassword : false;
+    }
 }

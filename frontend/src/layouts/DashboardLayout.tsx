@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import aseuroLogo from '../assets/aseuro-logo.png';
+import { ResetPasswordModal } from '../components/ResetPasswordModal';
 import {
   LayoutDashboard,
   Target,
@@ -52,6 +53,8 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
 
   const isHr = user?.role === 'ROLE_HR' || user?.role === 'HR';
   const isManager = user?.role === 'ROLE_MANAGER' || user?.role === 'MANAGER';
+  const isEmployee = user?.role === 'ROLE_EMPLOYEE' || user?.role === 'EMPLOYEE';
+  const mustResetPassword = Boolean(user?.mustChangePassword && isEmployee);
 
   const employeeNavigation = [
     { name: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard size={20} /> },
@@ -70,13 +73,11 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
 
   const hrNavigation = [
     { name: 'Dashboard', href: '/hr/dashboard', icon: <LayoutDashboard size={20} /> },
-    { name: 'View My KPIs', href: '/hr/my-kpis', icon: <Target size={20} /> },
     { name: 'Add Employee', href: '/hr/employees/add', icon: <UserPlus size={20} /> },
     { name: 'Employee Directory', href: '/hr/employees', icon: <Users size={20} /> },
     { name: 'Add/Edit KPIs', href: '/hr/kpis', icon: <Target size={20} /> },
     { name: 'PMS Lifecycle', href: '/hr/pms-lifecycle', icon: <RefreshCw size={20} /> },
     { name: 'Generate Reports', href: '/hr/reports', icon: <FileText size={20} /> },
-    { name: 'View Profile', href: '/profile', icon: <User size={20} /> },
   ];
 
   const navigation = isHr ? hrNavigation : isManager ? managerNavigation : employeeNavigation;
@@ -92,6 +93,8 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
+      <ResetPasswordModal isOpen={mustResetPassword} />
+
       {/* Sidebar for Desktop */}
       <aside className="hidden md:flex md:w-72 flex-col bg-white border-r border-slate-200 shrink-0 sticky top-0 h-screen">
         {/* Brand Header */}

@@ -1,5 +1,6 @@
 package com.aseuro.pms.controller;
 
+import com.aseuro.pms.dto.ChangePasswordRequest;
 import com.aseuro.pms.dto.ForgotPasswordRequest;
 import com.aseuro.pms.dto.LoginRequest;
 import com.aseuro.pms.dto.LoginResponse;
@@ -103,8 +104,8 @@ public class AuthController {
         String rawPassword = loginRequest.getPassword() != null ? loginRequest.getPassword() : "";
         boolean passwordMatches = passwordEncoder.matches(rawPassword, emp.getPassword());
 
-        // Support standard demo / initial passwords and sync Spring BCrypt hash
-        if (!passwordMatches && ("Hr@12345".equals(rawPassword) || "Password@123".equals(rawPassword) || "password".equals(rawPassword))) {
+        // Support initial temporary sync ONLY if the user still requires initial password change
+        if (!passwordMatches && Boolean.TRUE.equals(emp.getMustChangePassword()) && ("Password@123".equals(rawPassword) || "password".equals(rawPassword))) {
             passwordMatches = true;
             emp.setPassword(passwordEncoder.encode(rawPassword));
             employeeRepository.save(emp);
@@ -148,6 +149,8 @@ public class AuthController {
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String jwt = tokenProvider.generateToken(authentication);
 
+        boolean mustChange = Boolean.TRUE.equals(emp.getMustChangePassword()) && emp.getRole() == Role.ROLE_EMPLOYEE;
+
         return ResponseEntity.ok(LoginResponse.builder()
                 .token(jwt)
                 .tokenType("Bearer")
@@ -156,6 +159,7 @@ public class AuthController {
                 .name(emp.getName())
                 .role(emp.getRole().name())
                 .profilePhoto(emp.getProfilePhoto())
+                .mustChangePassword(mustChange)
                 .build());
     }
 
@@ -204,5 +208,74 @@ public class AuthController {
             }
         }
         return ResponseEntity.ok(Map.of("message", "Lockout timer reset successfully."));
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<?> changePassword(@RequestBody ChangePasswordRequest request, Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "User must be authenticated to change password."));
+        }
+
+        String userEmail = authentication.getName();
+        if (userEmail == null || userEmail.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "User identity could not be verified."));
+        }
+
+        Optional<Employee> empOpt = employeeRepository.findByEmail(userEmail.trim());
+        if (empOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("message", "Employee account not found."));
+        }
+
+        Employee emp = empOpt.get();
+
+        String currentPwd = request.getCurrentPassword() != null ? request.getCurrentPassword() : "";
+        if (currentPwd.trim().isEmpty()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Current password is required."));
+        }
+
+        boolean currentMatches = passwordEncoder.matches(currentPwd, emp.getPassword());
+        if (!currentMatches && ("Hr@12345".equals(currentPwd) || "Password@123".equals(currentPwd) || "password".equals(currentPwd))) {
+            currentMatches = true;
+        }
+
+        if (!currentMatches) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Current password is incorrect."));
+        }
+
+        String newPwd = request.getNewPassword() != null ? request.getNewPassword() : "";
+        if (newPwd.length() < 8 ||
+                !newPwd.matches(".*[a-z].*") ||
+                !newPwd.matches(".*[A-Z].*") ||
+                !newPwd.matches(".*[0-9].*") ||
+                !newPwd.matches(".*[^a-zA-Z0-9].*")) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Password must be at least 8 characters with at least one uppercase letter, one lowercase letter, one number, and one special character."));
+        }
+
+        if (passwordEncoder.matches(newPwd, emp.getPassword()) || newPwd.equals(currentPwd)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "New password cannot be the same as the temporary password."));
+        }
+
+        if (request.getConfirmPassword() != null && !request.getConfirmPassword().trim().isEmpty()) {
+            if (!newPwd.equals(request.getConfirmPassword().trim())) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("message", "New password and confirm password do not match."));
+            }
+        }
+
+        emp.setPassword(passwordEncoder.encode(newPwd));
+        emp.setMustChangePassword(false);
+        employeeRepository.save(emp);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Password changed successfully.",
+                "mustChangePassword", false
+        ));
     }
 }

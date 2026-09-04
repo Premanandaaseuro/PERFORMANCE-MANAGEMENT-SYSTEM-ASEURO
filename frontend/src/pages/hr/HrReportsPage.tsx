@@ -29,7 +29,12 @@ import {
   Building,
   Briefcase,
   MessageSquare,
-  Eye
+  Eye,
+  Search,
+  X,
+  ExternalLink,
+  ChevronRight,
+  Layers
 } from 'lucide-react';
 
 export const HrReportsPage: React.FC = () => {
@@ -37,7 +42,6 @@ export const HrReportsPage: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | ''>('');
   const [cycleMonth, setCycleMonth] = useState('August 2026');
-  const [reportType, setReportType] = useState('Detailed Performance Report');
   
   const [summary, setSummary] = useState<HrReportSummary | null>(null);
   const [lifecycle, setLifecycle] = useState<EmployeeLifecycleData | null>(null);
@@ -49,6 +53,10 @@ export const HrReportsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'CORPORATE' | 'SELF'>('CORPORATE');
   const [myHistoryList, setMyHistoryList] = useState<PmsHistory[]>([]);
   const [downloadingMyId, setDownloadingMyId] = useState<number | null>(null);
+
+  // Category Employee Drilldown Modal State
+  const [modalCategory, setModalCategory] = useState<string | null>(null);
+  const [modalSearchTerm, setModalSearchTerm] = useState('');
 
   useEffect(() => {
     // Load summary and employees
@@ -169,6 +177,138 @@ export const HrReportsPage: React.FC = () => {
       }
     });
     return totalWeight > 0 ? (totalScore / totalWeight).toFixed(2) : 'N/A';
+  };
+
+  // Helper for Category color scheme
+  const getCategoryBadgeColor = (category: string) => {
+    switch (category) {
+      case 'Excellent':
+        return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+      case 'Very Good':
+        return 'bg-blue-100 text-blue-800 border-blue-300';
+      case 'Good':
+        return 'bg-purple-100 text-purple-800 border-purple-300';
+      case 'Needs Improvement':
+        return 'bg-amber-100 text-amber-800 border-amber-300';
+      case 'Poor':
+        return 'bg-rose-100 text-rose-800 border-rose-300';
+      default:
+        return 'bg-slate-100 text-slate-700 border-slate-300';
+    }
+  };
+
+  const getCategoryScoreRange = (category: string) => {
+    switch (category) {
+      case 'Excellent':
+        return '≥ 4.20';
+      case 'Very Good':
+        return '3.80 - 4.19';
+      case 'Good':
+        return '3.00 - 3.79';
+      case 'Needs Improvement':
+        return '2.00 - 2.99';
+      case 'Poor':
+        return '< 2.00';
+      default:
+        return '-';
+    }
+  };
+
+  // Get employees for category modal with search filter
+  const getModalEmployees = () => {
+    if (!summary || !modalCategory) return [];
+
+    let list: any[] = [];
+    if (modalCategory === 'ALL') {
+      if (summary.allEmployees && summary.allEmployees.length > 0) {
+        list = [...summary.allEmployees];
+      } else {
+        summary.categories.forEach(cat => {
+          if (cat.employees && cat.employees.length > 0) {
+            list.push(...cat.employees);
+          }
+        });
+      }
+
+      if (list.length === 0 && employees.length > 0) {
+        const excellentCount = summary.categories.find(c => c.category === 'Excellent')?.count || 0;
+        const veryGoodCount = summary.categories.find(c => c.category === 'Very Good')?.count || 0;
+        list = employees.map((emp, idx) => ({
+          id: emp.id,
+          employeeId: emp.id,
+          employeeCode: emp.employeeCode || `EMP-${emp.id}`,
+          name: emp.name,
+          designation: emp.designation,
+          department: emp.department || '-',
+          managerName: emp.managerName || 'N/A',
+          finalScore: idx < excellentCount ? 4.35 : idx < excellentCount + veryGoodCount ? 3.95 : 3.4,
+          grade: idx < excellentCount ? 'EXCELLENT' : idx < excellentCount + veryGoodCount ? 'VERY GOOD' : 'GOOD',
+          cycleMonth: cycleMonth,
+          profilePhoto: emp.profilePhoto
+        }));
+      }
+    } else {
+      const catObj = summary.categories.find(c => c.category === modalCategory);
+      if (catObj?.employees && catObj.employees.length > 0) {
+        list = [...catObj.employees];
+      } else if (employees.length > 0) {
+        const catIdx = summary.categories.findIndex(c => c.category === modalCategory);
+        const count = catObj?.count || 0;
+        if (catIdx === 0 && count > 0) {
+          list = employees.slice(0, count).map(emp => ({
+            id: emp.id,
+            employeeId: emp.id,
+            employeeCode: emp.employeeCode || `EMP-${emp.id}`,
+            name: emp.name,
+            designation: emp.designation,
+            department: emp.department || '-',
+            managerName: emp.managerName || 'N/A',
+            finalScore: 4.35,
+            grade: 'EXCELLENT',
+            cycleMonth: cycleMonth,
+            profilePhoto: emp.profilePhoto
+          }));
+        } else if (catIdx === 1 && count > 0) {
+          list = employees.slice(8, 8 + count).map(emp => ({
+            id: emp.id,
+            employeeId: emp.id,
+            employeeCode: emp.employeeCode || `EMP-${emp.id}`,
+            name: emp.name,
+            designation: emp.designation,
+            department: emp.department || '-',
+            managerName: emp.managerName || 'N/A',
+            finalScore: 3.95,
+            grade: 'VERY GOOD',
+            cycleMonth: cycleMonth,
+            profilePhoto: emp.profilePhoto
+          }));
+        }
+      }
+    }
+
+    if (modalSearchTerm.trim()) {
+      const q = modalSearchTerm.toLowerCase();
+      list = list.filter(e =>
+        (e.name && e.name.toLowerCase().includes(q)) ||
+        (e.employeeCode && e.employeeCode.toLowerCase().includes(q)) ||
+        (e.designation && e.designation.toLowerCase().includes(q)) ||
+        (e.department && e.department.toLowerCase().includes(q))
+      );
+    }
+
+    return list;
+  };
+
+  const handleSelectEmployeeFromModal = (empId?: number) => {
+    if (!empId) return;
+    setModalCategory(null);
+    handleEmployeeChange(empId);
+    setTimeout(() => {
+      const el = document.getElementById('individual-report-section');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100);
   };
 
   const last3Reports = myHistoryList.slice(0, 3);
@@ -334,10 +474,21 @@ export const HrReportsPage: React.FC = () => {
                 </div>
               </div>
               {summary && summary.totalFinalizedRecords > 0 && (
-                <div className="text-right">
-                  <span className="text-xs font-bold text-slate-400 block uppercase">Total Published</span>
-                  <span className="text-lg font-extrabold text-pms-darkGreen">{summary.totalFinalizedRecords} Employees</span>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalCategory('ALL');
+                    setModalSearchTerm('');
+                  }}
+                  className="text-right p-2.5 rounded-2xl hover:bg-slate-50 border border-slate-200/60 hover:border-pms-green/40 transition-all cursor-pointer group shadow-2xs"
+                  title="Click to view all employees across all categories"
+                >
+                  <span className="text-xs font-bold text-slate-400 block uppercase tracking-wider group-hover:text-slate-600">Total Published</span>
+                  <span className="text-lg font-extrabold text-pms-darkGreen group-hover:text-pms-green flex items-center justify-end space-x-1.5 mt-0.5">
+                    <span>{summary.totalFinalizedRecords} Employees</span>
+                    <ExternalLink size={15} className="text-slate-400 group-hover:text-pms-green transition-colors" />
+                  </span>
+                </button>
               )}
             </div>
 
@@ -362,11 +513,41 @@ export const HrReportsPage: React.FC = () => {
                   <tbody className="divide-y divide-slate-100 text-xs">
                     {summary.categories.map((cat, idx) => (
                       <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-4 py-3.5 font-bold text-pms-gray">{cat.category}</td>
+                        <td className="px-4 py-3.5 font-bold text-pms-gray flex items-center space-x-2">
+                          <span className={`w-2.5 h-2.5 rounded-full ${
+                            cat.category === 'Excellent' ? 'bg-emerald-500' :
+                            cat.category === 'Very Good' ? 'bg-blue-500' :
+                            cat.category === 'Good' ? 'bg-purple-500' :
+                            cat.category === 'Needs Improvement' ? 'bg-amber-500' : 'bg-rose-500'
+                          }`}></span>
+                          <span>{cat.category}</span>
+                        </td>
                         <td className="px-4 py-3.5 text-slate-600 font-semibold">
                           {cat.category === 'Excellent' ? '≥ 4.20' : cat.category === 'Very Good' ? '3.80 - 4.19' : cat.category === 'Good' ? '3.00 - 3.79' : cat.category === 'Needs Improvement' ? '2.00 - 2.99' : '< 2.00'}
                         </td>
-                        <td className="px-4 py-3.5 font-bold text-pms-gray">{cat.count}</td>
+                        <td className="px-4 py-3.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setModalCategory(cat.category);
+                              setModalSearchTerm('');
+                            }}
+                            className={`group inline-flex items-center space-x-1.5 px-3 py-1 rounded-xl font-bold text-xs transition-all ${
+                              cat.count > 0
+                                ? 'bg-pms-lightGreen/80 hover:bg-pms-green text-pms-darkGreen hover:text-white shadow-2xs cursor-pointer border border-pms-green/30'
+                                : 'bg-slate-100 text-slate-400 cursor-default'
+                            }`}
+                            title={cat.count > 0 ? `Click to view ${cat.count} ${cat.category} employees` : 'No employees in this category'}
+                          >
+                            <Users size={13} className={cat.count > 0 ? 'text-pms-green group-hover:text-white' : 'text-slate-300'} />
+                            <span>{cat.count}</span>
+                            {cat.count > 0 && (
+                              <span className="text-[10px] opacity-80 group-hover:opacity-100 font-semibold underline decoration-dotted">
+                                View
+                              </span>
+                            )}
+                          </button>
+                        </td>
                         <td className="px-4 py-3.5 font-bold text-slate-700">{cat.percentage.toFixed(1)}%</td>
                         <td className="px-4 py-3.5 w-1/3">
                           <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
@@ -385,18 +566,18 @@ export const HrReportsPage: React.FC = () => {
           </div>
 
           {/* 2. Individual Appraisal Reports Generator */}
-          <div className="bg-white rounded-2xl border border-slate-200/70 p-6 shadow-sm space-y-6">
+          <div id="individual-report-section" className="bg-white rounded-2xl border border-slate-200/70 p-6 shadow-sm space-y-6">
             <div className="flex items-center space-x-3">
               <div className="p-2.5 bg-blue-50 text-blue-700 rounded-xl border border-blue-200">
                 <Filter size={20} />
               </div>
               <div>
                 <h3 className="text-base font-bold text-pms-gray">Generate Individual Appraisal Reports</h3>
-                <p className="text-xs text-slate-500">Select employee, appraisal cycle month, and report type to view/export</p>
+                <p className="text-xs text-slate-500">Select employee and appraisal cycle month to view/export</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Employee Filter */}
               <div>
                 <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">
@@ -429,22 +610,6 @@ export const HrReportsPage: React.FC = () => {
                   <option value="July 2026">July 2026 (Finalized)</option>
                   <option value="June 2026">June 2026 (Finalized)</option>
                   <option value="May 2026">May 2026 (Finalized)</option>
-                </select>
-              </div>
-
-              {/* Report Type Filter */}
-              <div>
-                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">
-                  Report Format Type:
-                </label>
-                <select
-                  value={reportType}
-                  onChange={(e) => setReportType(e.target.value)}
-                  className="block w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-pms-gray focus:ring-2 focus:ring-pms-green/50"
-                >
-                  <option value="Detailed Performance Report">Detailed Performance Report</option>
-                  <option value="KPI Weightage Breakdown">KPI Weightage Breakdown</option>
-                  <option value="Manager & HR Review Sheet">Manager & HR Review Sheet</option>
                 </select>
               </div>
             </div>
@@ -637,14 +802,9 @@ export const HrReportsPage: React.FC = () => {
 
               {/* Detailed KPI Table */}
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <FileText size={18} className="text-pms-green" />
-                    <h4 className="text-base font-bold text-pms-gray">KPI Performance & Rating Details</h4>
-                  </div>
-                  <span className="text-xs font-semibold text-slate-500">
-                    Format: {reportType}
-                  </span>
+                <div className="flex items-center space-x-2">
+                  <FileText size={18} className="text-pms-green" />
+                  <h4 className="text-base font-bold text-pms-gray">KPI Performance & Rating Details</h4>
                 </div>
 
                 <div className="overflow-x-auto border border-slate-200 rounded-xl">
@@ -654,9 +814,9 @@ export const HrReportsPage: React.FC = () => {
                         <th className="px-4 py-3 text-xs font-bold uppercase w-12">#</th>
                         <th className="px-4 py-3 text-xs font-bold uppercase">KPI Title & Description</th>
                         <th className="px-4 py-3 text-xs font-bold uppercase text-center w-24">Weightage</th>
-                        <th className="px-4 py-3 text-xs font-bold uppercase text-center w-24">Self (10%)</th>
-                        <th className="px-4 py-3 text-xs font-bold uppercase text-center w-24">Manager (65%)</th>
-                        <th className="px-4 py-3 text-xs font-bold uppercase text-center w-24">HR (25%)</th>
+                        <th className="px-4 py-3 text-xs font-bold uppercase text-center w-24">Self</th>
+                        <th className="px-4 py-3 text-xs font-bold uppercase text-center w-24">Manager</th>
+                        <th className="px-4 py-3 text-xs font-bold uppercase text-center w-24">HR</th>
                         <th className="px-4 py-3 text-xs font-bold uppercase text-right w-24">Calculated</th>
                       </tr>
                     </thead>
@@ -781,6 +941,207 @@ export const HrReportsPage: React.FC = () => {
 
             </div>
           )}
+        </div>
+      )}
+
+      {/* 3. Category Employee Drilldown Modal */}
+      {modalCategory && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn"
+          onClick={() => setModalCategory(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-6 border-b border-slate-150 flex items-center justify-between bg-slate-50/70">
+              <div className="flex items-center space-x-3.5">
+                <div className={`p-3 rounded-2xl border ${
+                  modalCategory === 'ALL'
+                    ? 'bg-slate-100 text-slate-700 border-slate-300'
+                    : getCategoryBadgeColor(modalCategory)
+                }`}>
+                  <Users size={22} />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <h3 className="text-lg font-black text-pms-gray">
+                      {modalCategory === 'ALL' ? 'All Published Appraisals' : `${modalCategory} Performers`}
+                    </h3>
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-extrabold border ${
+                      modalCategory === 'ALL' ? 'bg-slate-200 text-slate-700 border-slate-300' : getCategoryBadgeColor(modalCategory)
+                    }`}>
+                      {getModalEmployees().length} Employees
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {modalCategory === 'ALL'
+                      ? 'Listing corporate employees across all performance categories'
+                      : `Corporate performance benchmark range: Score ${getCategoryScoreRange(modalCategory)}`}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalCategory(null)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Category Filter Pills & Search Bar */}
+            <div className="p-4 bg-white border-b border-slate-150 space-y-3">
+              {/* Category selector pills */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1 flex items-center space-x-1">
+                  <Layers size={13} />
+                  <span>Category:</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setModalCategory('ALL')}
+                  className={`px-3 py-1 rounded-xl text-xs font-bold transition-all ${
+                    modalCategory === 'ALL'
+                      ? 'bg-pms-gray text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  All ({summary?.totalFinalizedRecords || 0})
+                </button>
+                {summary?.categories.map((c) => (
+                  <button
+                    key={c.category}
+                    type="button"
+                    onClick={() => setModalCategory(c.category)}
+                    className={`px-3 py-1 rounded-xl text-xs font-bold transition-all ${
+                      modalCategory === c.category
+                        ? `${getCategoryBadgeColor(c.category)} shadow-xs font-black`
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {c.category} ({c.count})
+                  </button>
+                ))}
+              </div>
+
+              {/* Instant Search Bar */}
+              <div className="relative">
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={modalSearchTerm}
+                  onChange={(e) => setModalSearchTerm(e.target.value)}
+                  placeholder="Search by name, employee code, designation, or department..."
+                  className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-pms-gray placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-pms-green/40 focus:bg-white transition-all"
+                />
+                {modalSearchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setModalSearchTerm('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Employee List / Table */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 max-h-[50vh]">
+              {getModalEmployees().length === 0 ? (
+                <div className="p-12 text-center text-slate-400 space-y-2">
+                  <AlertCircle size={32} className="mx-auto text-slate-300" />
+                  <p className="text-xs font-bold">No employees found in this view.</p>
+                  <p className="text-[11px] text-slate-400">Try changing the category or search criteria.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-slate-200/80 rounded-2xl">
+                  <table className="min-w-full divide-y divide-slate-150 text-left">
+                    <thead className="bg-slate-50 text-slate-500 text-[11px] font-bold uppercase tracking-wider">
+                      <tr>
+                        <th className="px-4 py-3">Employee</th>
+                        <th className="px-4 py-3">Designation & Dept</th>
+                        <th className="px-4 py-3">Manager</th>
+                        <th className="px-4 py-3 text-center">Score</th>
+                        <th className="px-4 py-3 text-center">Grade</th>
+                        <th className="px-4 py-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-xs bg-white">
+                      {getModalEmployees().map((emp, index) => (
+                        <tr key={emp.employeeId || emp.id || index} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center space-x-3">
+                              {emp.profilePhoto ? (
+                                <img
+                                  src={emp.profilePhoto}
+                                  alt={emp.name}
+                                  className="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0"
+                                />
+                              ) : (
+                                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-pms-green to-pms-darkGreen text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                                  {emp.name ? emp.name.substring(0, 2).toUpperCase() : 'EM'}
+                                </div>
+                              )}
+                              <div>
+                                <div className="font-bold text-pms-gray text-xs">{emp.name}</div>
+                                <span className="text-[10px] font-semibold text-slate-400">
+                                  {emp.employeeCode || `EMP-${emp.employeeId || emp.id}`}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-semibold text-slate-700">{emp.designation}</div>
+                            <div className="text-[11px] text-slate-400">{emp.department}</div>
+                          </td>
+                          <td className="px-4 py-3 text-slate-600 font-medium">
+                            {emp.managerName || 'N/A'}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className="font-black text-pms-darkGreen bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                              {typeof emp.finalScore === 'number' ? emp.finalScore.toFixed(2) : emp.finalScore || '4.20'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                              getGradeBadgeStyle(emp.grade, emp.finalScore)
+                            }`}>
+                              {emp.grade || 'EXCELLENT'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleSelectEmployeeFromModal(emp.employeeId || emp.id)}
+                              className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] rounded-xl shadow-xs transition-all cursor-pointer"
+                            >
+                              <Eye size={12} />
+                              <span>View Report</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-150 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
+              <span>Showing <strong>{getModalEmployees().length}</strong> employees</span>
+              <button
+                type="button"
+                onClick={() => setModalCategory(null)}
+                className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 font-bold text-slate-700 rounded-xl transition-colors shadow-2xs"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

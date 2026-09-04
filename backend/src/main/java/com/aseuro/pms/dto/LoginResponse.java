@@ -17,6 +17,7 @@ public class LoginResponse {
     private String name;
     private String role;
     private String profilePhoto;
+    private Boolean mustChangePassword;
 
     public LoginResponse(String token, String tokenType, String email, String name, String role) {
         this.token = token;
