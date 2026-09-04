@@ -194,9 +194,8 @@ public class ReportService {
 
                 Double effRating = null;
                 if (rating != null) {
-                    if (rating.getHrRating() != null) effRating = rating.getHrRating();
-                    else if (rating.getManagerRating() != null) effRating = rating.getManagerRating();
-                    else if (rating.getSelfRating() != null) effRating = rating.getSelfRating();
+                    if (rating.getHrRating() != null && rating.getHrRating() >= 1.0) effRating = rating.getHrRating();
+                    else if (rating.getManagerRating() != null && rating.getManagerRating() >= 1.0) effRating = rating.getManagerRating();
                 }
                 if (effRating == null && assignment.getOverallScore() != null) {
                     effRating = assignment.getOverallScore();
@@ -500,9 +499,8 @@ public class ReportService {
 
                 Double effRating = null;
                 if (rating != null) {
-                    if (rating.getHrRating() != null) effRating = rating.getHrRating();
-                    else if (rating.getManagerRating() != null) effRating = rating.getManagerRating();
-                    else if (rating.getSelfRating() != null) effRating = rating.getSelfRating();
+                    if (rating.getHrRating() != null && rating.getHrRating() >= 1.0) effRating = rating.getHrRating();
+                    else if (rating.getManagerRating() != null && rating.getManagerRating() >= 1.0) effRating = rating.getManagerRating();
                 }
                 if (effRating == null && assignment.getOverallScore() != null) {
                     effRating = assignment.getOverallScore();

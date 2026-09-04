@@ -52,9 +52,9 @@ export const HrPmsLifecyclePage: React.FC = () => {
   const [finalizing, setFinalizing] = useState(false);
 
   // Individual HR, Manager & Self Ratings & Comments State (Editable by HR)
-  const [hrRatings, setHrRatings] = useState<Record<number, number>>({});
-  const [managerRatings, setManagerRatings] = useState<Record<number, number>>({});
-  const [selfRatings, setSelfRatings] = useState<Record<number, number>>({});
+  const [hrRatings, setHrRatings] = useState<Record<number, number | string>>({});
+  const [managerRatings, setManagerRatings] = useState<Record<number, number | string>>({});
+  const [selfRatings, setSelfRatings] = useState<Record<number, number | string>>({});
   const [employeeCommentsMap, setEmployeeCommentsMap] = useState<Record<number, string>>({});
   const [managerCommentsMap, setManagerCommentsMap] = useState<Record<number, string>>({});
   const [hrCommentsMap, setHrCommentsMap] = useState<Record<number, string>>({});
@@ -97,15 +97,38 @@ export const HrPmsLifecyclePage: React.FC = () => {
     searchEmployees(q);
   };
 
-  const recalculateHrScore = (kpis: any[], ratingsMap: Record<number, number>) => {
+  const recalculateHrScore = (
+    kpis: any[],
+    currentHrRatings: Record<number, number | string>,
+    currentMgrRatings?: Record<number, number | string>
+  ) => {
     let weightedSum = 0;
     let totalWeight = 0;
+    const mgrMap = currentMgrRatings || managerRatings;
+
     kpis.forEach((kpi) => {
-      const r = ratingsMap[kpi.kpiId] ?? kpi.hrRating ?? 0;
-      weightedSum += r * (kpi.weightage / 100);
-      totalWeight += kpi.weightage;
+      // Prioritize HR rating, then Manager rating. DO NOT include Employee self rating!
+      const rawHr = currentHrRatings[kpi.kpiId] !== undefined ? currentHrRatings[kpi.kpiId] : kpi.hrRating;
+      const rawMgr = mgrMap[kpi.kpiId] !== undefined ? mgrMap[kpi.kpiId] : kpi.managerRating;
+
+      const hrVal = (rawHr !== null && rawHr !== undefined && rawHr !== '') ? Number(rawHr) : null;
+      const mgrVal = (rawMgr !== null && rawMgr !== undefined && rawMgr !== '') ? Number(rawMgr) : null;
+
+      let score: number | null = null;
+      if (hrVal !== null && hrVal >= 1.0 && hrVal <= 5.0) {
+        score = hrVal;
+      } else if (mgrVal !== null && mgrVal >= 1.0 && mgrVal <= 5.0) {
+        score = mgrVal;
+      }
+      // Strictly ignore employee self rating (kpi.selfRating)
+
+      if (score !== null) {
+        weightedSum += score * (kpi.weightage / 100);
+        totalWeight += kpi.weightage;
+      }
     });
-    const calculated = totalWeight > 0 ? Math.round(weightedSum * 100) / 100 : 0.0;
+
+    const calculated = totalWeight > 0 ? Math.round((weightedSum / (totalWeight / 100)) * 100) / 100 : 0.0;
     setHrScore(calculated);
     deriveGrade(calculated);
   };
@@ -117,18 +140,17 @@ export const HrPmsLifecyclePage: React.FC = () => {
     hrApi.getLifecycleDetail(empId)
       .then((data) => {
         setLifecycleData(data);
-        const initialHrRatings: Record<number, number> = {};
-        const initialMgrRatings: Record<number, number> = {};
-        const initialSelfRatings: Record<number, number> = {};
+        const initialHrRatings: Record<number, number | string> = {};
+        const initialMgrRatings: Record<number, number | string> = {};
+        const initialSelfRatings: Record<number, number | string> = {};
         const initialEmpComments: Record<number, string> = {};
         const initialMgrComments: Record<number, string> = {};
-
         const initialHrComments: Record<number, string> = {};
 
         data.kpis.forEach((kpi) => {
-          initialHrRatings[kpi.kpiId] = (kpi.hrRating !== null && kpi.hrRating !== undefined) ? kpi.hrRating : 0;
-          initialMgrRatings[kpi.kpiId] = (kpi.managerRating !== null && kpi.managerRating !== undefined) ? kpi.managerRating : 0;
-          initialSelfRatings[kpi.kpiId] = (kpi.selfRating !== null && kpi.selfRating !== undefined) ? kpi.selfRating : 0;
+          initialHrRatings[kpi.kpiId] = (kpi.hrRating !== null && kpi.hrRating !== undefined && kpi.hrRating >= 1.0) ? kpi.hrRating : '';
+          initialMgrRatings[kpi.kpiId] = (kpi.managerRating !== null && kpi.managerRating !== undefined && kpi.managerRating >= 1.0) ? kpi.managerRating : '';
+          initialSelfRatings[kpi.kpiId] = (kpi.selfRating !== null && kpi.selfRating !== undefined && kpi.selfRating >= 1.0) ? kpi.selfRating : '';
           initialEmpComments[kpi.kpiId] = kpi.employeeComments || kpi.comments || '';
           initialMgrComments[kpi.kpiId] = kpi.managerComments || '';
           initialHrComments[kpi.kpiId] = kpi.hrComments || '';
@@ -141,7 +163,7 @@ export const HrPmsLifecyclePage: React.FC = () => {
         setManagerCommentsMap(initialMgrComments);
         setHrCommentsMap(initialHrComments);
 
-        recalculateHrScore(data.kpis, initialHrRatings);
+        recalculateHrScore(data.kpis, initialHrRatings, initialMgrRatings);
         setLoading(false);
       })
       .catch((err) => {
@@ -156,16 +178,53 @@ export const HrPmsLifecyclePage: React.FC = () => {
     try {
       setSavingRatings(true);
       setError(null);
+
+      // Validate that ratings are between 1.0 and 5.0 and cannot be 0
+      for (const kpi of lifecycleData.kpis || []) {
+        const hr = hrRatings[kpi.kpiId];
+        if (hr !== undefined && hr !== null && hr !== '') {
+          const num = Number(hr);
+          if (isNaN(num) || num < 1.0 || num > 5.0) {
+            setError(`HR rating for "${kpi.kpiName}" must be between 1.0 and 5.0. 0 is not allowed.`);
+            setSavingRatings(false);
+            return;
+          }
+        }
+        const mgr = managerRatings[kpi.kpiId];
+        if (mgr !== undefined && mgr !== null && mgr !== '') {
+          const num = Number(mgr);
+          if (isNaN(num) || num < 1.0 || num > 5.0) {
+            setError(`Manager rating for "${kpi.kpiName}" must be between 1.0 and 5.0. 0 is not allowed.`);
+            setSavingRatings(false);
+            return;
+          }
+        }
+        const self = selfRatings[kpi.kpiId];
+        if (self !== undefined && self !== null && self !== '') {
+          const num = Number(self);
+          if (isNaN(num) || num < 1.0 || num > 5.0) {
+            setError(`Self rating for "${kpi.kpiName}" must be between 1.0 and 5.0. 0 is not allowed.`);
+            setSavingRatings(false);
+            return;
+          }
+        }
+      }
+
       const payload = {
-        kpiRatings: lifecycleData.kpis.map((kpi) => ({
-          kpiId: kpi.kpiId,
-          selfRating: selfRatings[kpi.kpiId] !== undefined ? selfRatings[kpi.kpiId] : kpi.selfRating,
-          employeeComments: employeeCommentsMap[kpi.kpiId] !== undefined ? employeeCommentsMap[kpi.kpiId] : (kpi.employeeComments || kpi.comments || ''),
-          managerRating: managerRatings[kpi.kpiId] !== undefined ? managerRatings[kpi.kpiId] : kpi.managerRating,
-          managerComments: managerCommentsMap[kpi.kpiId] !== undefined ? managerCommentsMap[kpi.kpiId] : (kpi.managerComments || ''),
-          hrRating: hrRatings[kpi.kpiId] !== undefined ? hrRatings[kpi.kpiId] : kpi.hrRating,
-          hrComments: hrCommentsMap[kpi.kpiId] !== undefined ? hrCommentsMap[kpi.kpiId] : (kpi.hrComments || ''),
-        }))
+        kpiRatings: lifecycleData.kpis.map((kpi) => {
+          const hrVal = hrRatings[kpi.kpiId] !== undefined && hrRatings[kpi.kpiId] !== '' ? Number(hrRatings[kpi.kpiId]) : (kpi.hrRating ?? null);
+          const mgrVal = managerRatings[kpi.kpiId] !== undefined && managerRatings[kpi.kpiId] !== '' ? Number(managerRatings[kpi.kpiId]) : (kpi.managerRating ?? null);
+          const selfVal = selfRatings[kpi.kpiId] !== undefined && selfRatings[kpi.kpiId] !== '' ? Number(selfRatings[kpi.kpiId]) : (kpi.selfRating ?? null);
+          return {
+            kpiId: kpi.kpiId,
+            selfRating: selfVal,
+            employeeComments: employeeCommentsMap[kpi.kpiId] !== undefined ? employeeCommentsMap[kpi.kpiId] : (kpi.employeeComments || kpi.comments || ''),
+            managerRating: mgrVal,
+            managerComments: managerCommentsMap[kpi.kpiId] !== undefined ? managerCommentsMap[kpi.kpiId] : (kpi.managerComments || ''),
+            hrRating: hrVal,
+            hrComments: hrCommentsMap[kpi.kpiId] !== undefined ? hrCommentsMap[kpi.kpiId] : (kpi.hrComments || ''),
+          };
+        })
       };
       await hrApi.updateLifecycleRatings(lifecycleData.assignmentId, payload);
       setSuccess('KPI Ratings & Comments updated successfully! Changes are immediately reflected in Employee and Manager modules.');
@@ -191,24 +250,28 @@ export const HrPmsLifecyclePage: React.FC = () => {
   };
 
   const handleScoreChange = (score: number) => {
-    setHrScore(score);
-    deriveGrade(score);
+    const clamped = Math.max(1.0, Math.min(5.0, score));
+    setHrScore(clamped);
+    deriveGrade(clamped);
   };
 
   const handleHrKpiRatingChange = (kpiId: number, rating: number) => {
-    const updated = { ...hrRatings, [kpiId]: rating };
+    const clamped = Math.max(1.0, Math.min(5.0, rating));
+    const updated = { ...hrRatings, [kpiId]: clamped };
     setHrRatings(updated);
     if (lifecycleData?.kpis) {
-      recalculateHrScore(lifecycleData.kpis, updated);
+      recalculateHrScore(lifecycleData.kpis, updated, managerRatings);
     }
   };
 
   const handleManagerKpiRatingChange = (kpiId: number, rating: number) => {
-    const updated = { ...managerRatings, [kpiId]: rating };
+    const clamped = Math.max(1.0, Math.min(5.0, rating));
+    const updated = { ...managerRatings, [kpiId]: clamped };
     setManagerRatings(updated);
     if (lifecycleData?.kpis) {
-      const updatedKpis = lifecycleData.kpis.map(k => k.kpiId === kpiId ? { ...k, managerRating: rating } : k);
+      const updatedKpis = lifecycleData.kpis.map(k => k.kpiId === kpiId ? { ...k, managerRating: clamped } : k);
       setLifecycleData({ ...lifecycleData, kpis: updatedKpis });
+      recalculateHrScore(lifecycleData.kpis, hrRatings, updated);
     }
   };
 
@@ -217,11 +280,36 @@ export const HrPmsLifecyclePage: React.FC = () => {
     setFinalizing(true);
     setError(null);
     try {
-      const kpiRatingsPayload = (lifecycleData.kpis || []).map((kpi) => ({
-        kpiId: kpi.kpiId,
-        hrRating: Number(hrRatings[kpi.kpiId] ?? kpi.hrRating ?? 5.0),
-        managerRating: Number(managerRatings[kpi.kpiId] ?? kpi.managerRating ?? 5.0)
-      }));
+      // Validate that ratings are between 1.0 and 5.0
+      for (const kpi of lifecycleData.kpis || []) {
+        const rawHr = hrRatings[kpi.kpiId] ?? kpi.hrRating;
+        if (rawHr !== undefined && rawHr !== null && rawHr !== '') {
+          const num = Number(rawHr);
+          if (num < 1.0 || num > 5.0) {
+            setError(`HR rating for "${kpi.kpiName}" must be between 1.0 and 5.0. 0 is not allowed.`);
+            setFinalizing(false);
+            return;
+          }
+        }
+      }
+
+      if (hrScore < 1.0 || hrScore > 5.0) {
+        setError('Overall score must be between 1.0 and 5.0.');
+        setFinalizing(false);
+        return;
+      }
+
+      const kpiRatingsPayload = (lifecycleData.kpis || []).map((kpi) => {
+        const rawHr = hrRatings[kpi.kpiId] ?? kpi.hrRating;
+        const rawMgr = managerRatings[kpi.kpiId] ?? kpi.managerRating;
+        const hrNum = (rawHr !== undefined && rawHr !== null && rawHr !== '') ? Number(rawHr) : undefined;
+        const mgrNum = (rawMgr !== undefined && rawMgr !== null && rawMgr !== '') ? Number(rawMgr) : undefined;
+        return {
+          kpiId: kpi.kpiId,
+          hrRating: hrNum,
+          managerRating: mgrNum
+        };
+      });
 
       const res = await hrApi.finalizePms(lifecycleData.assignmentId, {
         overallScore: hrScore,
@@ -370,7 +458,7 @@ export const HrPmsLifecyclePage: React.FC = () => {
 
       {/* Top Summary Stat Cards for PMS Lifecycle Stages */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-        <div 
+        <div
           onClick={() => setStatusFilter('ALL')}
           className={`p-4 rounded-2xl border transition-all cursor-pointer ${statusFilter === 'ALL' ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
         >
@@ -382,7 +470,7 @@ export const HrPmsLifecyclePage: React.FC = () => {
           <span className="text-[10px] opacity-75 font-medium block mt-0.5">All employees in cycle</span>
         </div>
 
-        <div 
+        <div
           onClick={() => setStatusFilter('PENDING_SELF')}
           className={`p-4 rounded-2xl border transition-all cursor-pointer ${statusFilter === 'PENDING_SELF' ? 'bg-amber-600 text-white border-amber-600 shadow-md' : 'bg-amber-50/70 border-amber-200 text-amber-900 hover:bg-amber-100/60'}`}
         >
@@ -394,7 +482,7 @@ export const HrPmsLifecyclePage: React.FC = () => {
           <span className="text-[10px] opacity-80 font-medium block mt-0.5">Awaiting self assessment</span>
         </div>
 
-        <div 
+        <div
           onClick={() => setStatusFilter('PENDING_MANAGER')}
           className={`p-4 rounded-2xl border transition-all cursor-pointer ${statusFilter === 'PENDING_MANAGER' ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-blue-50/70 border-blue-200 text-blue-900 hover:bg-blue-100/60'}`}
         >
@@ -406,7 +494,7 @@ export const HrPmsLifecyclePage: React.FC = () => {
           <span className="text-[10px] opacity-80 font-medium block mt-0.5">Awaiting manager review</span>
         </div>
 
-        <div 
+        <div
           onClick={() => setStatusFilter('PENDING_HR')}
           className={`p-4 rounded-2xl border transition-all cursor-pointer ${statusFilter === 'PENDING_HR' ? 'bg-purple-700 text-white border-purple-700 shadow-md' : 'bg-purple-50/80 border-purple-200 text-purple-900 hover:bg-purple-100/70'}`}
         >
@@ -418,7 +506,7 @@ export const HrPmsLifecyclePage: React.FC = () => {
           <span className="text-[10px] opacity-80 font-medium block mt-0.5">Awaiting final HR sign-off</span>
         </div>
 
-        <div 
+        <div
           onClick={() => setStatusFilter('COMPLETED')}
           className={`p-4 rounded-2xl border transition-all cursor-pointer ${statusFilter === 'COMPLETED' ? 'bg-emerald-700 text-white border-emerald-700 shadow-md' : 'bg-emerald-50/70 border-emerald-200 text-emerald-900 hover:bg-emerald-100/60'}`}
         >
@@ -447,7 +535,7 @@ export const HrPmsLifecyclePage: React.FC = () => {
 
       {/* Main Grid: Left Column Search List & Right Column Lifecycle Detail */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
+
         {/* Left Column: Employee Selector */}
         <div className="lg:col-span-4 space-y-4">
           <div className="bg-white p-4 rounded-2xl border border-slate-200/70 shadow-sm space-y-3">
@@ -518,11 +606,10 @@ export const HrPmsLifecyclePage: React.FC = () => {
                   <button
                     key={emp.id}
                     onClick={() => fetchLifecycle(emp.id)}
-                    className={`w-full text-left p-3 rounded-xl transition-all flex items-center justify-between ${
-                      selectedEmployeeId === emp.id
+                    className={`w-full text-left p-3 rounded-xl transition-all flex items-center justify-between ${selectedEmployeeId === emp.id
                         ? 'bg-pms-lightGreen border border-pms-green/30 text-pms-darkGreen font-bold shadow-xs'
                         : 'hover:bg-slate-50 text-slate-600 border border-transparent'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center space-x-2.5 min-w-0">
                       {emp.profilePhoto ? (
@@ -593,13 +680,12 @@ export const HrPmsLifecyclePage: React.FC = () => {
 
                 <div className="text-right">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Cycle Status</span>
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-extrabold mt-1 ${
-                    isCompleted
+                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-extrabold mt-1 ${isCompleted
                       ? 'bg-pms-lightGreen text-pms-darkGreen border border-pms-green/20'
                       : isPendingHr(lifecycleData?.status)
-                      ? 'bg-purple-100 text-purple-900 border border-purple-300'
-                      : 'bg-blue-50 text-blue-800 border border-blue-200'
-                  }`}>
+                        ? 'bg-purple-100 text-purple-900 border border-purple-300'
+                        : 'bg-blue-50 text-blue-800 border border-blue-200'
+                    }`}>
                     {lifecycleData?.cycleMonth || 'August 2026'}: {
                       lifecycleData?.status === 'MANAGER_REVIEW_SUBMITTED'
                         ? 'MANAGER REVIEW SUBMITTED (AWAITING HR REVIEW)'
@@ -621,19 +707,17 @@ export const HrPmsLifecyclePage: React.FC = () => {
                     const isPending = stage.status === 'Pending' || stage.status === 'In Progress';
                     return (
                       <div key={stage.step} className="flex flex-col items-center text-center p-2 rounded-xl">
-                        <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs mb-2 transition-all ${
-                          isDone
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs mb-2 transition-all ${isDone
                             ? 'bg-pms-green text-white shadow-sm ring-4 ring-pms-green/15'
                             : isPending
-                            ? 'bg-blue-600 text-white shadow-sm ring-4 ring-blue-100'
-                            : 'bg-slate-100 text-slate-400 border border-slate-200'
-                        }`}>
+                              ? 'bg-blue-600 text-white shadow-sm ring-4 ring-blue-100'
+                              : 'bg-slate-100 text-slate-400 border border-slate-200'
+                          }`}>
                           {isDone ? <CheckCircle2 size={16} /> : stage.step}
                         </div>
                         <span className="text-xs font-bold text-pms-gray truncate w-full">{stage.title}</span>
-                        <span className={`text-[10px] font-bold mt-0.5 ${
-                          isDone ? 'text-pms-darkGreen' : isPending ? 'text-blue-600' : 'text-slate-400'
-                        }`}>
+                        <span className={`text-[10px] font-bold mt-0.5 ${isDone ? 'text-pms-darkGreen' : isPending ? 'text-blue-600' : 'text-slate-400'
+                          }`}>
                           {stage.status}
                         </span>
                       </div>
@@ -697,12 +781,28 @@ export const HrPmsLifecyclePage: React.FC = () => {
                               <input
                                 type="number"
                                 step="0.1"
-                                min="0"
+                                min="1"
                                 max="5"
                                 value={selfRatings[kpi.kpiId] !== undefined ? selfRatings[kpi.kpiId] : (kpi.selfRating ?? '')}
-                                onChange={(e) => setSelfRatings(prev => ({ ...prev, [kpi.kpiId]: Math.min(5, Math.max(0, parseFloat(e.target.value) || 0)) }))}
-                                placeholder="0.0"
-                                className="w-16 px-2 py-1 text-center font-extrabold text-xs border rounded-lg border-emerald-300 text-emerald-800 bg-emerald-50/50 focus:bg-white"
+                                onChange={(e) => {
+                                  const raw = e.target.value;
+                                  if (raw === '') {
+                                    setSelfRatings(prev => ({ ...prev, [kpi.kpiId]: '' }));
+                                  } else {
+                                    const num = parseFloat(raw);
+                                    if (isNaN(num)) {
+                                      setSelfRatings(prev => ({ ...prev, [kpi.kpiId]: '' }));
+                                    } else if (num < 1.0) {
+                                      setSelfRatings(prev => ({ ...prev, [kpi.kpiId]: 1.0 }));
+                                    } else if (num > 5.0) {
+                                      setSelfRatings(prev => ({ ...prev, [kpi.kpiId]: 5.0 }));
+                                    } else {
+                                      setSelfRatings(prev => ({ ...prev, [kpi.kpiId]: num }));
+                                    }
+                                  }
+                                }}
+                                placeholder="1.0 - 5.0"
+                                className="w-20 px-2 py-1 text-center font-extrabold text-xs border rounded-lg border-emerald-300 text-emerald-800 bg-emerald-50/50 focus:bg-white"
                               />
                             </div>
 
@@ -714,12 +814,26 @@ export const HrPmsLifecyclePage: React.FC = () => {
                               <input
                                 type="number"
                                 step="0.1"
-                                min="0"
+                                min="1"
                                 max="5"
                                 value={managerRatings[kpi.kpiId] !== undefined ? managerRatings[kpi.kpiId] : (kpi.managerRating ?? '')}
-                                onChange={(e) => setManagerRatings(prev => ({ ...prev, [kpi.kpiId]: Math.min(5, Math.max(0, parseFloat(e.target.value) || 0)) }))}
-                                placeholder="0.0"
-                                className={`w-16 px-2 py-1 text-center font-extrabold text-xs border rounded-lg ${isHr25 ? 'border-purple-300 text-purple-900 bg-purple-100/50' : 'border-purple-200 text-purple-700 bg-purple-50/30'} focus:bg-white`}
+                                onChange={(e) => {
+                                  const raw = e.target.value;
+                                  let finalVal: number | string = '';
+                                  if (raw !== '') {
+                                    const num = parseFloat(raw);
+                                    if (!isNaN(num)) {
+                                      if (num < 1.0) finalVal = 1.0;
+                                      else if (num > 5.0) finalVal = 5.0;
+                                      else finalVal = num;
+                                    }
+                                  }
+                                  const nextMgr = { ...managerRatings, [kpi.kpiId]: finalVal };
+                                  setManagerRatings(nextMgr);
+                                  recalculateHrScore(lifecycleData?.kpis || [], hrRatings, nextMgr);
+                                }}
+                                placeholder="1.0 - 5.0"
+                                className={`w-20 px-2 py-1 text-center font-extrabold text-xs border rounded-lg ${isHr25 ? 'border-purple-300 text-purple-900 bg-purple-100/50' : 'border-purple-200 text-purple-700 bg-purple-50/30'} focus:bg-white`}
                               />
                             </div>
 
@@ -731,19 +845,26 @@ export const HrPmsLifecyclePage: React.FC = () => {
                               <input
                                 type="number"
                                 step="0.1"
-                                min="0"
+                                min="1"
                                 max="5"
-                                value={hrRatings[kpi.kpiId] !== undefined ? hrRatings[kpi.kpiId] : (kpi.hrRating ?? 0)}
+                                value={hrRatings[kpi.kpiId] !== undefined ? hrRatings[kpi.kpiId] : (kpi.hrRating ?? '')}
                                 onChange={(e) => {
-                                  const val = Math.min(5, Math.max(0, parseFloat(e.target.value) || 0));
-                                  setHrRatings(prev => {
-                                    const next = { ...prev, [kpi.kpiId]: val };
-                                    recalculateHrScore(lifecycleData?.kpis || [], next);
-                                    return next;
-                                  });
+                                  const raw = e.target.value;
+                                  let finalVal: number | string = '';
+                                  if (raw !== '') {
+                                    const num = parseFloat(raw);
+                                    if (!isNaN(num)) {
+                                      if (num < 1.0) finalVal = 1.0;
+                                      else if (num > 5.0) finalVal = 5.0;
+                                      else finalVal = num;
+                                    }
+                                  }
+                                  const nextHr = { ...hrRatings, [kpi.kpiId]: finalVal };
+                                  setHrRatings(nextHr);
+                                  recalculateHrScore(lifecycleData?.kpis || [], nextHr, managerRatings);
                                 }}
-                                placeholder="0.0"
-                                className="w-16 px-2 py-1 text-center font-extrabold text-xs border rounded-lg border-blue-300 text-blue-800 bg-blue-50/50 focus:bg-white"
+                                placeholder="1.0 - 5.0"
+                                className="w-20 px-2 py-1 text-center font-extrabold text-xs border rounded-lg border-blue-300 text-blue-800 bg-blue-50/50 focus:bg-white"
                               />
                             </div>
                           </div>

@@ -69,11 +69,11 @@ export const HrPmsLifecyclePage: React.FC = () => {
     let weightedSum = 0;
     let totalWeight = 0;
     kpis.forEach((kpi) => {
-      const r = ratingsMap[kpi.kpiId] ?? kpi.hrRating ?? kpi.managerRating ?? kpi.selfRating ?? 5.0;
+      const r = ratingsMap[kpi.kpiId] ?? kpi.hrRating ?? kpi.managerRating ?? 4.0;
       weightedSum += r * (kpi.weightage / 100);
       totalWeight += kpi.weightage;
     });
-    const calculated = totalWeight > 0 ? Math.round(weightedSum * 100) / 100 : 5.0;
+    const calculated = totalWeight > 0 ? Math.round((weightedSum / (totalWeight / 100)) * 100) / 100 : 4.0;
     setHrScore(calculated);
     deriveGrade(calculated);
   };
@@ -88,8 +88,8 @@ export const HrPmsLifecyclePage: React.FC = () => {
         const initialHrRatings: Record<number, number> = {};
         const initialMgrRatings: Record<number, number> = {};
         data.kpis.forEach((kpi) => {
-          initialHrRatings[kpi.kpiId] = kpi.hrRating ?? kpi.managerRating ?? kpi.selfRating ?? 5.0;
-          initialMgrRatings[kpi.kpiId] = kpi.managerRating ?? kpi.selfRating ?? 5.0;
+          initialHrRatings[kpi.kpiId] = (kpi.hrRating && kpi.hrRating >= 1.0) ? kpi.hrRating : ((kpi.managerRating && kpi.managerRating >= 1.0) ? kpi.managerRating : 4.0);
+          initialMgrRatings[kpi.kpiId] = (kpi.managerRating && kpi.managerRating >= 1.0) ? kpi.managerRating : 4.0;
         });
         setHrRatings(initialHrRatings);
         setManagerRatings(initialMgrRatings);
@@ -213,7 +213,7 @@ export const HrPmsLifecyclePage: React.FC = () => {
 
       {/* Main Grid: Left Column Search List & Right Column Lifecycle Detail */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
+
         {/* Left Column: Employee Selector */}
         <div className="lg:col-span-4 space-y-4">
           <div className="bg-white p-4 rounded-2xl border border-slate-200/70 shadow-sm space-y-3">
@@ -239,11 +239,10 @@ export const HrPmsLifecyclePage: React.FC = () => {
                 <button
                   key={emp.id}
                   onClick={() => fetchLifecycle(emp.id)}
-                  className={`w-full text-left p-3 rounded-xl transition-all flex items-center justify-between ${
-                    selectedEmployeeId === emp.id
-                      ? 'bg-pms-lightGreen border border-pms-green/30 text-pms-darkGreen font-bold shadow-xs'
-                      : 'hover:bg-slate-50 text-slate-600 border border-transparent'
-                  }`}
+                  className={`w-full text-left p-3 rounded-xl transition-all flex items-center justify-between ${selectedEmployeeId === emp.id
+                    ? 'bg-pms-lightGreen border border-pms-green/30 text-pms-darkGreen font-bold shadow-xs'
+                    : 'hover:bg-slate-50 text-slate-600 border border-transparent'
+                    }`}
                 >
                   <div className="flex items-center space-x-2.5 min-w-0">
                     {emp.profilePhoto ? (
@@ -305,11 +304,10 @@ export const HrPmsLifecyclePage: React.FC = () => {
 
                 <div className="text-right">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Cycle Status</span>
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-extrabold mt-1 ${
-                    isCompleted
-                      ? 'bg-pms-lightGreen text-pms-darkGreen border border-pms-green/20'
-                      : 'bg-blue-50 text-blue-800 border border-blue-200'
-                  }`}>
+                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-extrabold mt-1 ${isCompleted
+                    ? 'bg-pms-lightGreen text-pms-darkGreen border border-pms-green/20'
+                    : 'bg-blue-50 text-blue-800 border border-blue-200'
+                    }`}>
                     {lifecycleData.cycleMonth || 'August 2026'}: {lifecycleData.status?.replace(/_/g, ' ') || 'ACTIVE'}
                   </span>
                 </div>
@@ -327,19 +325,17 @@ export const HrPmsLifecyclePage: React.FC = () => {
                     const isPending = stage.status === 'Pending' || stage.status === 'In Progress';
                     return (
                       <div key={stage.step} className="flex flex-col items-center text-center p-2 rounded-xl">
-                        <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs mb-2 transition-all ${
-                          isDone
-                            ? 'bg-pms-green text-white shadow-sm ring-4 ring-pms-green/15'
-                            : isPending
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs mb-2 transition-all ${isDone
+                          ? 'bg-pms-green text-white shadow-sm ring-4 ring-pms-green/15'
+                          : isPending
                             ? 'bg-blue-600 text-white shadow-sm ring-4 ring-blue-100'
                             : 'bg-slate-100 text-slate-400 border border-slate-200'
-                        }`}>
+                          }`}>
                           {isDone ? <CheckCircle2 size={16} /> : stage.step}
                         </div>
                         <span className="text-xs font-bold text-pms-gray truncate w-full">{stage.title}</span>
-                        <span className={`text-[10px] font-bold mt-0.5 ${
-                          isDone ? 'text-pms-darkGreen' : isPending ? 'text-blue-600' : 'text-slate-400'
-                        }`}>
+                        <span className={`text-[10px] font-bold mt-0.5 ${isDone ? 'text-pms-darkGreen' : isPending ? 'text-blue-600' : 'text-slate-400'
+                          }`}>
                           {stage.status}
                         </span>
                       </div>
@@ -432,9 +428,8 @@ export const HrPmsLifecyclePage: React.FC = () => {
                             </div>
                           </td>
                           <td className="px-4 py-3 text-xs font-bold text-center">
-                            <span className={`px-2 py-0.5 rounded-full text-[9px] ${
-                              kpi.selfRating !== null ? 'bg-pms-lightGreen text-pms-darkGreen font-bold' : 'bg-slate-100 text-slate-400'
-                            }`}>
+                            <span className={`px-2 py-0.5 rounded-full text-[9px] ${kpi.selfRating !== null ? 'bg-pms-lightGreen text-pms-darkGreen font-bold' : 'bg-slate-100 text-slate-400'
+                              }`}>
                               {kpi.selfRating !== null ? 'RATED' : 'PENDING'}
                             </span>
                           </td>

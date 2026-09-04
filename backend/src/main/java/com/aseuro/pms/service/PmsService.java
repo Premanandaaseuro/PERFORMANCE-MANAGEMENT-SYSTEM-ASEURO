@@ -362,7 +362,6 @@ public class PmsService {
             Double effectiveHrRating = r != null ? r.getHrRating() : null;
             if (effectiveHrRating == null && (assignment.getStatus() == PMSState.COMPLETED || assignment.getStatus() == PMSState.FINAL_RESULT_PUBLISHED)) {
                 if (r != null && r.getManagerRating() != null) effectiveHrRating = r.getManagerRating();
-                else if (r != null && r.getSelfRating() != null) effectiveHrRating = r.getSelfRating();
                 else if (assignment.getOverallScore() != null) effectiveHrRating = assignment.getOverallScore();
             }
             return KpiDto.builder()

@@ -146,7 +146,6 @@ public class HrLifecycleService {
             Double hrRating = r != null ? r.getHrRating() : null;
             if (hrRating == null && (assignment.getStatus() == PMSState.COMPLETED || assignment.getStatus() == PMSState.FINAL_RESULT_PUBLISHED)) {
                 if (r != null && r.getManagerRating() != null) hrRating = r.getManagerRating();
-                else if (r != null && r.getSelfRating() != null) hrRating = r.getSelfRating();
                 else if (assignment.getOverallScore() != null) hrRating = assignment.getOverallScore();
             }
             km.put("selfRating", r != null ? r.getSelfRating() : null);
@@ -158,12 +157,11 @@ public class HrLifecycleService {
             km.put("hrComments", r != null ? r.getHrComments() : null);
             km.put("ratingStatus", r != null ? r.getStatus() : "PENDING");
 
-            // Final score contribution
+            // Final score contribution - calculated from Manager and HR ratings only (strictly excluding employee self rating)
             Double effRating = null;
             if (r != null) {
-                if (r.getHrRating() != null) effRating = r.getHrRating();
-                else if (r.getManagerRating() != null) effRating = r.getManagerRating();
-                else if (r.getSelfRating() != null) effRating = r.getSelfRating();
+                if (r.getHrRating() != null && r.getHrRating() >= 1.0) effRating = r.getHrRating();
+                else if (r.getManagerRating() != null && r.getManagerRating() >= 1.0) effRating = r.getManagerRating();
             }
             if (effRating != null) {
                 calculatedWeightedSum += effRating * (kpi.getWeightage() / 100.0);
@@ -173,7 +171,7 @@ public class HrLifecycleService {
             kpiList.add(km);
         }
         response.put("kpis", kpiList);
-        response.put("calculatedScore", totalWeight > 0 ? Math.round(calculatedWeightedSum * 100.0) / 100.0 : null);
+        response.put("calculatedScore", totalWeight > 0 ? Math.round((calculatedWeightedSum / (totalWeight / 100.0)) * 100.0) / 100.0 : null);
 
         // Reviews
         List<EmployeeReview> reviews = employeeReviewRepository.findByAssignment(assignment);
@@ -211,7 +209,13 @@ public class HrLifecycleService {
             List<EmployeeKpiRating> existingRatings = employeeKpiRatingRepository.findByAssignment(assignment);
 
             for (HrFinalizeRequest.HrKpiRatingEntry entry : request.getKpiRatings()) {
-                if (entry.getKpiId() == null || entry.getHrRating() == null) continue;
+                if (entry.getKpiId() == null) continue;
+                if (entry.getHrRating() != null && (entry.getHrRating() < 1.0 || entry.getHrRating() > 5.0)) {
+                    throw new ApiException(HttpStatus.BAD_REQUEST, "HR rating must be between 1.0 and 5.0. Rating cannot be 0.");
+                }
+                if (entry.getManagerRating() != null && (entry.getManagerRating() < 1.0 || entry.getManagerRating() > 5.0)) {
+                    throw new ApiException(HttpStatus.BAD_REQUEST, "Manager rating must be between 1.0 and 5.0. Rating cannot be 0.");
+                }
                 PmsKpi matchedKpi = kpis.stream()
                         .filter(k -> k.getId().equals(entry.getKpiId()))
                         .findFirst().orElse(null);
@@ -238,7 +242,7 @@ public class HrLifecycleService {
 
         // Calculate final score if not explicitly given
         Double finalScore = request.getOverallScore();
-        if (finalScore == null || finalScore <= 0) {
+        if (finalScore == null || finalScore < 1.0 || finalScore > 5.0) {
             List<PmsKpi> kpis = pmsKpiRepository.findByAssignment(assignment);
             List<EmployeeKpiRating> ratings = employeeKpiRatingRepository.findByAssignment(assignment);
             double weightedSum = 0.0;
@@ -248,16 +252,18 @@ public class HrLifecycleService {
                 EmployeeKpiRating r = ratings.stream()
                         .filter(rt -> rt.getKpi().getId().equals(kpi.getId()))
                         .findFirst().orElse(null);
-                Double score = 4.0; // fallback
+                Double score = null;
                 if (r != null) {
-                    if (r.getHrRating() != null) score = r.getHrRating();
-                    else if (r.getManagerRating() != null) score = r.getManagerRating();
-                    else if (r.getSelfRating() != null) score = r.getSelfRating();
+                    if (r.getHrRating() != null && r.getHrRating() >= 1.0) score = r.getHrRating();
+                    else if (r.getManagerRating() != null && r.getManagerRating() >= 1.0) score = r.getManagerRating();
+                    // Exclude employee self rating
                 }
-                weightedSum += score * (kpi.getWeightage() / 100.0);
-                totalWeight += kpi.getWeightage();
+                if (score != null) {
+                    weightedSum += score * (kpi.getWeightage() / 100.0);
+                    totalWeight += kpi.getWeightage();
+                }
             }
-            finalScore = totalWeight > 0 ? Math.round(weightedSum * 100.0) / 100.0 : 4.0;
+            finalScore = totalWeight > 0 ? Math.round((weightedSum / (totalWeight / 100.0)) * 100.0) / 100.0 : 4.0;
         }
 
         String grade = request.getPerformanceGrade();
@@ -333,6 +339,15 @@ public class HrLifecycleService {
 
         for (HrUpdateKpiRatingsRequest.HrKpiRatingUpdateEntry entry : request.getKpiRatings()) {
             if (entry.getKpiId() == null) continue;
+            if (entry.getSelfRating() != null && (entry.getSelfRating() < 1.0 || entry.getSelfRating() > 5.0)) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Self rating must be between 1.0 and 5.0. Rating cannot be 0.");
+            }
+            if (entry.getManagerRating() != null && (entry.getManagerRating() < 1.0 || entry.getManagerRating() > 5.0)) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Manager rating must be between 1.0 and 5.0. Rating cannot be 0.");
+            }
+            if (entry.getHrRating() != null && (entry.getHrRating() < 1.0 || entry.getHrRating() > 5.0)) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "HR rating must be between 1.0 and 5.0. Rating cannot be 0.");
+            }
             PmsKpi matchedKpi = kpis.stream()
                     .filter(k -> k.getId().equals(entry.getKpiId()))
                     .findFirst().orElse(null);
@@ -342,9 +357,9 @@ public class HrLifecycleService {
                     .filter(r -> r.getKpi().getId().equals(entry.getKpiId()))
                     .findFirst()
                     .orElseGet(() -> EmployeeKpiRating.builder()
-                            .assignment(assignment)
-                            .kpi(matchedKpi)
-                            .build());
+                                    .assignment(assignment)
+                                    .kpi(matchedKpi)
+                                    .build());
 
             if (entry.getSelfRating() != null) {
                 rating.setSelfRating(entry.getSelfRating());
@@ -369,6 +384,7 @@ public class HrLifecycleService {
         }
 
         // Recalculate overall weighted score on PmsAssignment for employee, manager, and HR dashboards
+        // (Calculated from Manager and HR ratings only - strictly excluding employee self rating)
         List<EmployeeKpiRating> updatedRatings = employeeKpiRatingRepository.findByAssignment(assignment);
         double weightedSum = 0.0;
         double totalWeight = 0.0;
@@ -379,9 +395,9 @@ public class HrLifecycleService {
                     .findFirst().orElse(null);
             Double score = null;
             if (r != null) {
-                if (r.getHrRating() != null) score = r.getHrRating();
-                else if (r.getManagerRating() != null) score = r.getManagerRating();
-                else if (r.getSelfRating() != null) score = r.getSelfRating();
+                if (r.getHrRating() != null && r.getHrRating() >= 1.0) score = r.getHrRating();
+                else if (r.getManagerRating() != null && r.getManagerRating() >= 1.0) score = r.getManagerRating();
+                // Strictly exclude employee self rating
             }
             if (score != null) {
                 weightedSum += score * (kpi.getWeightage() / 100.0);
@@ -390,7 +406,7 @@ public class HrLifecycleService {
         }
 
         if (totalWeight > 0) {
-            double calcScore = Math.round(weightedSum * 100.0) / 100.0;
+            double calcScore = Math.round((weightedSum / (totalWeight / 100.0)) * 100.0) / 100.0;
             assignment.setOverallScore(calcScore);
 
             String grade;
