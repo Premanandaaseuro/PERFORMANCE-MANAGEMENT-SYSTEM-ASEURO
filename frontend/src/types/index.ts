@@ -214,6 +214,14 @@ export interface EmployeeLifecycleData {
     grade: string;
     finalizedDate: string;
   }>;
+  availableCycles?: Array<{
+    assignmentId: number;
+    cycleMonth: string;
+    status: string;
+    overallScore?: number | null;
+    performanceGrade?: string | null;
+    finalizedDate?: string | null;
+  }>;
 }
 
 export interface CategoryEmployee {

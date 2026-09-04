@@ -527,8 +527,10 @@ public class HrManagementController {
     }
 
     @GetMapping("/lifecycle/{employeeId}")
-    public ResponseEntity<Map<String, Object>> getLifecycleDetail(@PathVariable Long employeeId) {
-        Map<String, Object> data = hrLifecycleService.getEmployeeLifecycle(employeeId);
+    public ResponseEntity<Map<String, Object>> getLifecycleDetail(
+            @PathVariable Long employeeId,
+            @RequestParam(required = false) String cycleMonth) {
+        Map<String, Object> data = hrLifecycleService.getEmployeeLifecycle(employeeId, cycleMonth);
         return ResponseEntity.ok(data);
     }
 

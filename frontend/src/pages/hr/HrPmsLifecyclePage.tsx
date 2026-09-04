@@ -133,11 +133,11 @@ export const HrPmsLifecyclePage: React.FC = () => {
     deriveGrade(calculated);
   };
 
-  const fetchLifecycle = (empId: number) => {
+  const fetchLifecycle = (empId: number, targetCycle?: string) => {
     setLoading(true);
     setError(null);
     setSelectedEmployeeId(empId);
-    hrApi.getLifecycleDetail(empId)
+    hrApi.getLifecycleDetail(empId, targetCycle)
       .then((data) => {
         setLifecycleData(data);
         const initialHrRatings: Record<number, number | string> = {};
@@ -678,9 +678,26 @@ export const HrPmsLifecyclePage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="text-right">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Cycle Status</span>
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-extrabold mt-1 ${isCompleted
+                <div className="text-right flex flex-col items-end gap-1.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Appraisal Cycle</span>
+                  {lifecycleData?.availableCycles && lifecycleData.availableCycles.length > 1 && (
+                    <select
+                      value={lifecycleData.cycleMonth}
+                      onChange={(e) => {
+                        if (selectedEmployeeId) {
+                          fetchLifecycle(selectedEmployeeId, e.target.value);
+                        }
+                      }}
+                      className="px-3 py-1 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-700 shadow-xs focus:ring-2 focus:ring-pms-green/40 cursor-pointer"
+                    >
+                      {lifecycleData.availableCycles.map(c => (
+                        <option key={c.assignmentId} value={c.cycleMonth}>
+                          {c.cycleMonth} ({c.status === 'COMPLETED' ? 'Finalized' : c.status.replace(/_/g, ' ')})
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-extrabold mt-0.5 ${isCompleted
                       ? 'bg-pms-lightGreen text-pms-darkGreen border border-pms-green/20'
                       : isPendingHr(lifecycleData?.status)
                         ? 'bg-purple-100 text-purple-900 border border-purple-300'

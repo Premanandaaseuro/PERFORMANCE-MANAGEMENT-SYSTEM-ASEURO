@@ -80,10 +80,26 @@ public class HrLifecycleService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> getEmployeeLifecycle(Long employeeId) {
+        return getEmployeeLifecycle(employeeId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getEmployeeLifecycle(Long employeeId, String cycleMonth) {
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Employee not found"));
 
-        Optional<PmsAssignment> assignmentOpt = pmsAssignmentRepository.findFirstByEmployeeOrderByStartDateDesc(employee);
+        List<PmsAssignment> allAssignments = pmsAssignmentRepository.findByEmployee(employee);
+        allAssignments.sort((a, b) -> Long.compare(b.getId(), a.getId()));
+
+        Optional<PmsAssignment> assignmentOpt = Optional.empty();
+        if (cycleMonth != null && !cycleMonth.trim().isEmpty()) {
+            assignmentOpt = allAssignments.stream()
+                    .filter(a -> a.getCycleMonth() != null && a.getCycleMonth().trim().equalsIgnoreCase(cycleMonth.trim()))
+                    .findFirst();
+        }
+        if (assignmentOpt.isEmpty() && !allAssignments.isEmpty()) {
+            assignmentOpt = Optional.of(allAssignments.get(0));
+        }
 
         Map<String, Object> response = new HashMap<>();
 
@@ -102,6 +118,19 @@ public class HrLifecycleService {
                 .profilePhoto(employee.getProfilePhoto())
                 .build();
         response.put("employee", empDto);
+
+        // Populate all available appraisal cycles for this employee
+        List<Map<String, Object>> availableCycles = allAssignments.stream().map(a -> {
+            Map<String, Object> c = new HashMap<>();
+            c.put("assignmentId", a.getId());
+            c.put("cycleMonth", a.getCycleMonth() != null ? a.getCycleMonth() : "Cycle-" + a.getId());
+            c.put("status", a.getStatus().name());
+            c.put("overallScore", a.getOverallScore());
+            c.put("performanceGrade", a.getPerformanceGrade());
+            c.put("finalizedDate", a.getFinalizedDate());
+            return c;
+        }).collect(Collectors.toList());
+        response.put("availableCycles", availableCycles);
 
         if (assignmentOpt.isEmpty()) {
             response.put("hasActiveAssignment", false);

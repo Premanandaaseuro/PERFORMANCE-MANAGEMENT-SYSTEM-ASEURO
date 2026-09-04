@@ -121,8 +121,10 @@ export const hrApi = {
     return response.data;
   },
 
-  getLifecycleDetail: async (employeeId: number): Promise<EmployeeLifecycleData> => {
-    const response = await apiClient.get<EmployeeLifecycleData>(`/api/hr/lifecycle/${employeeId}`);
+  getLifecycleDetail: async (employeeId: number, cycleMonth?: string): Promise<EmployeeLifecycleData> => {
+    const response = await apiClient.get<EmployeeLifecycleData>(`/api/hr/lifecycle/${employeeId}`, {
+      params: cycleMonth ? { cycleMonth } : undefined
+    });
     return response.data;
   },
 

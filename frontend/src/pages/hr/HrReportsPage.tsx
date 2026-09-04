@@ -42,6 +42,13 @@ export const HrReportsPage: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | ''>('');
   const [cycleMonth, setCycleMonth] = useState('August 2026');
+  const [availableCycles, setAvailableCycles] = useState<Array<{
+    assignmentId: number;
+    cycleMonth: string;
+    status: string;
+    overallScore?: number | null;
+    performanceGrade?: string | null;
+  }>>([]);
   
   const [summary, setSummary] = useState<HrReportSummary | null>(null);
   const [lifecycle, setLifecycle] = useState<EmployeeLifecycleData | null>(null);
@@ -82,11 +89,28 @@ export const HrReportsPage: React.FC = () => {
       });
   }, []);
 
-  const fetchEmployeeReport = (empId: number) => {
+  const fetchEmployeeReport = (empId: number, targetCycle?: string) => {
     setLoadingReport(true);
-    hrApi.getLifecycleDetail(empId)
+    hrApi.getLifecycleDetail(empId, targetCycle)
       .then((data) => {
         setLifecycle(data);
+        if (data.availableCycles && data.availableCycles.length > 0) {
+          setAvailableCycles(data.availableCycles);
+          if (!targetCycle && data.cycleMonth) {
+            setCycleMonth(data.cycleMonth);
+          }
+        } else if (data.cycleMonth) {
+          setAvailableCycles([{
+            assignmentId: data.assignmentId || 0,
+            cycleMonth: data.cycleMonth,
+            status: data.status || 'ACTIVE',
+            overallScore: data.overallScore,
+            performanceGrade: data.performanceGrade
+          }]);
+          if (!targetCycle) {
+            setCycleMonth(data.cycleMonth);
+          }
+        }
         setLoadingReport(false);
       })
       .catch((err) => {
@@ -98,6 +122,13 @@ export const HrReportsPage: React.FC = () => {
   const handleEmployeeChange = (empId: number) => {
     setSelectedEmployeeId(empId);
     fetchEmployeeReport(empId);
+  };
+
+  const handleCycleChange = (month: string) => {
+    setCycleMonth(month);
+    if (selectedEmployeeId) {
+      fetchEmployeeReport(Number(selectedEmployeeId), month);
+    }
   };
 
   const handleDownload = async (format: 'pdf' | 'excel') => {
@@ -603,13 +634,24 @@ export const HrReportsPage: React.FC = () => {
                 </label>
                 <select
                   value={cycleMonth}
-                  onChange={(e) => setCycleMonth(e.target.value)}
+                  onChange={(e) => handleCycleChange(e.target.value)}
                   className="block w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-pms-gray focus:ring-2 focus:ring-pms-green/50"
                 >
-                  <option value="August 2026">August 2026 (Active Cycle)</option>
-                  <option value="July 2026">July 2026 (Finalized)</option>
-                  <option value="June 2026">June 2026 (Finalized)</option>
-                  <option value="May 2026">May 2026 (Finalized)</option>
+                  {availableCycles.length > 0 ? (
+                    availableCycles.map((c) => {
+                      const isFin = c.status === 'COMPLETED' || c.status === 'FINAL_RESULT_PUBLISHED';
+                      return (
+                        <option key={c.assignmentId} value={c.cycleMonth}>
+                          {c.cycleMonth} ({isFin ? 'Finalized' : c.status.replace(/_/g, ' ')})
+                        </option>
+                      );
+                    })
+                  ) : (
+                    <>
+                      {cycleMonth && <option value={cycleMonth}>{cycleMonth}</option>}
+                      <option value="August 2026">August 2026 (Active Cycle)</option>
+                    </>
+                  )}
                 </select>
               </div>
             </div>
