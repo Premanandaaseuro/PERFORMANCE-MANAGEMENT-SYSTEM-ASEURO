@@ -24,6 +24,10 @@ export class LoginPage {
     await this.page.waitForLoadState('networkidle');
   }
 
+  async navigate() {
+    await this.goto();
+  }
+
   async login(email: string, password: string) {
     if (email) await this.emailInput.fill(email);
     else await this.emailInput.clear();
