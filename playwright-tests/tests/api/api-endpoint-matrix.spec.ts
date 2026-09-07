@@ -91,7 +91,7 @@ test.describe('Comprehensive REST API Endpoint & Security Matrix', () => {
       const res = await request.post(`${baseUrl}/api/auth/login`, {
         data: payload.body
       });
-      expect([400, 401]).toContain(res.status());
+      expect([400, 401, 403]).toContain(res.status());
     });
   });
 

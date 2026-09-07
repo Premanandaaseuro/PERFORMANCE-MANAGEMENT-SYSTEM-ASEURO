@@ -94,7 +94,7 @@ test.describe('Authentication Security & Edge Cases Matrix', () => {
   passwordBoundaries.forEach((item, index) => {
     test(`AUTH-VAL-PASS-${String(index + 1).padStart(2, '0')}: Password boundary handling (${item.name})`, async ({ loginPage, page }) => {
       await loginPage.goto();
-      await loginPage.login('employee@aseuro.com', item.pass);
+      await loginPage.login('security-boundary-test@aseuro.com', item.pass);
       await page.waitForTimeout(300);
       expect(page.url()).toContain('/login');
     });
