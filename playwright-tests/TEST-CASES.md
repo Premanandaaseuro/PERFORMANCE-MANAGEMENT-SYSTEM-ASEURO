@@ -441,3 +441,65 @@ This document details all test cases automated inside the Playwright testing sui
 * **Scenario**: Tab key focus cycling across login inputs and Enter key form submission.
 * **Automation File**: `tests/ui/ui-interactions.spec.ts`
 
+---
+
+### Authentication Security & Boundary Matrix (40 Cases)
+* **`AUTH-SEC-SQL-01` to `AUTH-SEC-SQL-10`**: 10 SQL injection vectors tested against credentials fields (`' OR '1'='1`, `admin' --`, `'; DROP TABLE...`, `UNION SELECT...`).
+* **`AUTH-SEC-XSS-01` to `AUTH-SEC-XSS-10`**: 10 XSS payload strings (`<script>`, `img onerror`, `svg onload`, `javascript:`, `iframe`).
+* **`AUTH-VAL-EMAIL-01` to `AUTH-VAL-EMAIL-10`**: 10 malformed email RFC-compliant rejections.
+* **`AUTH-VAL-PASS-01` to `AUTH-VAL-PASS-10`**: 10 password boundary edge cases (single char, unicode, 256-char overflow, special symbols).
+* **Automation File**: `tests/auth/auth-security-matrix.spec.ts`
+
+---
+
+### Role-Based Access Control (RBAC) Route Matrix (64 Cases)
+* **`RBAC-ANON-ROUTE-01` to `RBAC-ANON-ROUTE-16`**: 16 protected routes tested unauthenticated -> verified redirected to `/login`.
+* **`RBAC-EMP-ROUTE-01` to `RBAC-EMP-ROUTE-16`**: 16 protected routes tested as Employee -> HR/Manager routes redirected to `/unauthorized`.
+* **`RBAC-MGR-ROUTE-01` to `RBAC-MGR-ROUTE-16`**: 16 protected routes tested as Manager -> HR routes redirected to `/unauthorized`.
+* **`RBAC-HR-ROUTE-01` to `RBAC-HR-ROUTE-16`**: 16 protected routes tested as HR -> verified full administrative access.
+* **Automation File**: `tests/security/rbac-route-matrix.spec.ts`
+
+---
+
+### Comprehensive REST API Endpoint & Security Matrix (60 Cases)
+* **`API-MATRIX-UNAUTH-01` to `API-MATRIX-UNAUTH-12`**: 12 core GET endpoints reject unauthenticated access with 401/403.
+* **`API-MATRIX-BADTOKEN-01` to `API-MATRIX-BADTOKEN-12`**: 12 core GET endpoints reject corrupted Bearer token with 401/403.
+* **`API-MATRIX-METHOD-01` to `API-MATRIX-METHOD-12`**: 12 core GET endpoints reject invalid DELETE methods.
+* **`API-MATRIX-PARAM-01` to `API-MATRIX-PARAM-12`**: 12 core GET endpoints handle negative, boundary, and SQL query params safely without 500 error.
+* **`API-MATRIX-PAYLOAD-01` to `API-MATRIX-PAYLOAD-12`**: 12 body mutations (empty, nulls, array in object, huge buffer, boolean, unicode) safely rejected on `/api/auth/login`.
+* **Automation File**: `tests/api/api-endpoint-matrix.spec.ts`
+
+---
+
+### Form Boundary, Rating Scale & Search Pattern Matrix (50 Cases)
+* **`VAL-RATING-01` to `VAL-RATING-25`**: 25 rating boundary tests (-5, -1, 0, 0.5, 0.99, 1.0, 1.1, 2.5, 3.0, 4.0, 4.99, 5.0, 5.01, 6.0, 10, 100, 9999).
+* **`VAL-SEARCH-01` to `VAL-SEARCH-25`**: 25 search field query patterns (empty, 1 char, 50 chars, special punctuation, SQL quotes, unicode, emojis, wildcards, regex characters).
+* **Automation File**: `tests/validation/form-boundary-matrix.spec.ts`
+
+---
+
+### Responsive Viewport Matrix (40 Cases)
+* **`RESP-LOGIN-01` to `RESP-LOGIN-08`**: Login page verified on 8 viewports (1920x1080 to 375x667).
+* **`RESP-EMP-DASH-01` to `RESP-EMP-DASH-08`**: Employee Dashboard verified on 8 viewports.
+* **`RESP-EMP-KPIS-01` to `RESP-EMP-KPIS-08`**: Employee My KPIs verified on 8 viewports.
+* **`RESP-HR-DASH-01` to `RESP-HR-DASH-08`**: HR Dashboard verified on 8 viewports.
+* **`RESP-MGR-DASH-01` to `RESP-MGR-DASH-08`**: Manager Dashboard verified on 8 viewports.
+* **Automation File**: `tests/responsive/viewport-matrix.spec.ts`
+
+---
+
+### Automated WCAG Accessibility Matrix (20 Cases)
+* **`A11Y-PUB-01` to `A11Y-PUB-04`**: WCAG 2.1 AA audit on 4 public routes (/login, /unauthorized, /session-expired, 404).
+* **`A11Y-EMP-01` to `A11Y-EMP-05`**: WCAG audit on 5 employee routes (/dashboard, /kpis, /history, /reports, /profile).
+* **`A11Y-MGR-01` to `A11Y-MGR-04`**: WCAG audit on 4 manager routes (/dashboard, /my-kpis, /employees, /reports).
+* **`A11Y-HR-01` to `A11Y-HR-07`**: WCAG audit on 7 HR routes (/dashboard, /employees, /employees/add, /kpis, /managers, /pms-lifecycle, /reports).
+* **Automation File**: `tests/accessibility/accessibility-matrix.spec.ts`
+
+---
+
+### API Latency & Performance Benchmark Matrix (13 Cases)
+* **`PERF-LATENCY-01` to `PERF-LATENCY-12`**: 12 core REST endpoints verified to respond in under 1000ms.
+* **`PERF-BURST-01`**: Concurrent 3-request API burst completed cleanly without socket degradation.
+* **Automation File**: `tests/performance/latency-benchmark.spec.ts`
+
+
