@@ -1,9 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { hrApi } from '../../api/hrApi';
-import { pmsApi } from '../../api/pmsApi';
-import { reportApi } from '../../api/reportApi';
-import { Employee, HrReportSummary, EmployeeLifecycleData, PmsHistory } from '../../types';
+import { Employee, HrReportSummary, EmployeeLifecycleData } from '../../types';
 import {
   BarChart,
   Bar,
@@ -57,12 +55,10 @@ export const HrReportsPage: React.FC = () => {
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'OVERALL' | 'CORPORATE' | 'SELF'>('OVERALL');
-  const [myHistoryList, setMyHistoryList] = useState<PmsHistory[]>([]);
-  const [downloadingMyId, setDownloadingMyId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<'OVERALL' | 'CORPORATE'>('OVERALL');
 
   // Overall Cycle Report State
-  const [cycleOverallMonth, setCycleOverallMonth] = useState<string>('ALL');
+  const [cycleOverallMonth, setCycleOverallMonth] = useState<string>('August 2026');
   const [cycleOverallData, setCycleOverallData] = useState<{
     cycleMonth: string;
     totalEmployees: number;
@@ -101,6 +97,11 @@ export const HrReportsPage: React.FC = () => {
     hrApi.getCycleOverallReport(target)
       .then((data) => {
         setCycleOverallData(data);
+        if (data.availableCycles && data.availableCycles.length > 0) {
+          if (month && month !== 'ALL' && !data.availableCycles.includes(month)) {
+            setCycleOverallMonth(data.availableCycles[0]);
+          }
+        }
         setLoadingCycleReport(false);
       })
       .catch((err) => {
@@ -144,16 +145,14 @@ export const HrReportsPage: React.FC = () => {
 
   useEffect(() => {
     // Load summary, employees, and cycle overall report
-    fetchCycleOverallReport('ALL');
+    fetchCycleOverallReport('August 2026');
     Promise.all([
       hrApi.getReportsSummary(),
-      hrApi.searchLifecycleEmployees(),
-      pmsApi.getHistory()
+      hrApi.searchLifecycleEmployees()
     ])
-      .then(([sumData, empList, historyData]) => {
+      .then(([sumData, empList]) => {
         setSummary(sumData);
         setEmployees(empList);
-        setMyHistoryList(historyData || []);
         if (empList.length > 0) {
           setSelectedEmployeeId(empList[0].id);
           fetchEmployeeReport(empList[0].id);
@@ -234,17 +233,7 @@ export const HrReportsPage: React.FC = () => {
     }
   };
 
-  const handleDownloadMyPdf = async (assignmentId: number, cycleMonth: string) => {
-    setDownloadingMyId(assignmentId);
-    try {
-      await reportApi.downloadReport(assignmentId, 'pdf', `My_PMS_Report_${cycleMonth.replace(/\s+/g, '_')}.pdf`);
-    } catch (err) {
-      console.error(err);
-      alert('Failed to download PDF report. Please try again.');
-    } finally {
-      setDownloadingMyId(null);
-    }
-  };
+
 
   // Helper for Grade Badge styling
   const getGradeBadgeStyle = (grade?: string | null, score?: number | null) => {
@@ -420,10 +409,7 @@ export const HrReportsPage: React.FC = () => {
     }, 100);
   };
 
-  const last3Reports = myHistoryList.slice(0, 3);
-  const avg3MonthScore = last3Reports.length > 0
-    ? (last3Reports.reduce((sum, r) => sum + r.finalScore, 0) / last3Reports.length).toFixed(2)
-    : null;
+
 
   const filteredCycleEmployees = (cycleOverallData?.employees || []).filter((emp) => {
     const q = cycleSearchTerm.toLowerCase().trim();
@@ -464,7 +450,7 @@ export const HrReportsPage: React.FC = () => {
           </div>
           <h2 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">Appraisal & Rating Reports</h2>
           <p className="text-xs md:text-sm text-slate-500 mt-1 max-w-xl">
-            View consolidated cycle reports for all employees, drill down into individual evaluations, or review your own scores.
+            View consolidated cycle reports for all employees and drill down into individual evaluations.
           </p>
         </div>
 
@@ -491,17 +477,6 @@ export const HrReportsPage: React.FC = () => {
           >
             <Users size={16} />
             <span>Individual Employee Reports</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('SELF')}
-            className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
-              activeTab === 'SELF'
-                ? 'bg-pms-green text-white shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <User size={16} />
-            <span>My Personal Ratings & Reports</span>
           </button>
         </div>
       </div>
@@ -535,10 +510,10 @@ export const HrReportsPage: React.FC = () => {
                       }}
                       className="px-3.5 py-2 text-sm font-bold bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-pms-green transition-all"
                     >
-                      <option value="ALL">🌟 All PMS Cycles (Consolidated)</option>
                       {(cycleOverallData?.availableCycles || []).map((c) => (
-                        <option key={c} value={c}>{c}</option>
+                        <option key={c} value={c}>📅 {c}</option>
                       ))}
+                      <option value="ALL">🌟 All PMS Cycles (Consolidated)</option>
                     </select>
                   </div>
                 </div>
@@ -794,91 +769,6 @@ export const HrReportsPage: React.FC = () => {
               </div>
             )}
           </div>
-        </div>
-      ) : activeTab === 'SELF' ? (
-        <div className="space-y-6">
-          {myHistoryList.length === 0 ? (
-            <div className="bg-white border border-slate-200/80 rounded-3xl p-12 text-center shadow-xs">
-              <FileText className="text-slate-300 mx-auto mb-3" size={48} />
-              <h3 className="text-base font-bold text-slate-700">No Finalized Personal Reports Yet</h3>
-              <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                Your personal finalized performance appraisals will appear here once the active cycle evaluation is complete.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {/* Quarterly Performance Average Bar */}
-              {avg3MonthScore && (
-                <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/80 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xs">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 rounded-xl bg-pms-green text-white flex items-center justify-center font-bold shadow-sm">
-                      <Award size={24} />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-black text-slate-800">Quarterly 3-Month Performance Average</h4>
-                      <p className="text-xs text-slate-500 mt-0.5">Rolling average score across your last 3 finalized cycles</p>
-                    </div>
-                  </div>
-                  <div className="flex items-baseline space-x-2">
-                    <span className="text-3xl font-black text-pms-darkGreen">{avg3MonthScore}</span>
-                    <span className="text-sm text-slate-400 font-bold">/ 5.00</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Monthly Appraisal Cards Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {myHistoryList.map((h: PmsHistory) => (
-                  <div
-                    key={h.id}
-                    className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
-                  >
-                    <div className="space-y-3">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 rounded-lg bg-pms-lightGreen flex items-center justify-center text-pms-darkGreen shrink-0 font-semibold shadow-inner">
-                          <FileText size={22} />
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-base text-pms-gray">{h.cycleMonth} Appraisal</h4>
-                          <p className="text-xs text-slate-400 mt-0.5">Finalized on {h.finalizedDate}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2 pt-1">
-                        <span className="text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200/80 px-2.5 py-1 rounded">
-                          Score: {h.finalScore.toFixed(2)} / 5.00
-                        </span>
-                        <span className="text-[11px] font-bold text-pms-darkGreen bg-pms-lightGreen/60 border border-pms-green/20 px-3 py-1 rounded-full uppercase tracking-wider">
-                          {h.grade}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Action Buttons: View and Download PDF */}
-                    <div className="pt-3 border-t border-slate-100 flex items-center justify-end space-x-3">
-                      <button
-                        onClick={() => navigate(`/history/${h.assignmentId || h.id}`)}
-                        className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 hover:text-pms-gray rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1.5 shadow-xs"
-                        title="View online report details"
-                      >
-                        <Eye size={15} />
-                        <span>View</span>
-                      </button>
-                      <button
-                        onClick={() => handleDownloadMyPdf(h.assignmentId || h.id, h.cycleMonth)}
-                        disabled={downloadingMyId === (h.assignmentId || h.id)}
-                        className="px-4 py-2 bg-pms-green hover:bg-pms-darkGreen text-white rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1.5 shadow-xs disabled:opacity-50"
-                        title="Download PDF report"
-                      >
-                        <Download size={15} />
-                        <span>Download PDF</span>
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       ) : (
         /* TAB 2: CORPORATE PERFORMANCE REPORTS */

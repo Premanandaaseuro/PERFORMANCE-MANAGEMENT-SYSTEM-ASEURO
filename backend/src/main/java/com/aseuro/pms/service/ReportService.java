@@ -554,6 +554,16 @@ public class ReportService {
         }
         assignments.sort((a, b) -> Long.compare(b.getId(), a.getId()));
 
+        if (cycleMonth == null || cycleMonth.trim().isEmpty() || cycleMonth.equalsIgnoreCase("ALL")) {
+            Map<Long, PmsAssignment> latestByEmp = new LinkedHashMap<>();
+            for (PmsAssignment a : assignments) {
+                if (a.getEmployee() != null) {
+                    latestByEmp.putIfAbsent(a.getEmployee().getId(), a);
+                }
+            }
+            assignments = new ArrayList<>(latestByEmp.values());
+        }
+
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("Overall PMS Report");
 
@@ -633,6 +643,16 @@ public class ReportService {
             assignments = pmsAssignmentRepository.findAll();
         }
         assignments.sort((a, b) -> Long.compare(b.getId(), a.getId()));
+
+        if (cycleMonth == null || cycleMonth.trim().isEmpty() || cycleMonth.equalsIgnoreCase("ALL")) {
+            Map<Long, PmsAssignment> latestByEmp = new LinkedHashMap<>();
+            for (PmsAssignment a : assignments) {
+                if (a.getEmployee() != null) {
+                    latestByEmp.putIfAbsent(a.getEmployee().getId(), a);
+                }
+            }
+            assignments = new ArrayList<>(latestByEmp.values());
+        }
 
         try (PDDocument document = new PDDocument()) {
             PDType1Font fontBold = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);

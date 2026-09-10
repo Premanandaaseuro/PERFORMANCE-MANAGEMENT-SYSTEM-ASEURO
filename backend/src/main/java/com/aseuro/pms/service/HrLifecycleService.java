@@ -574,8 +574,9 @@ public class HrLifecycleService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> getCycleOverallReport(String cycleMonth) {
+        boolean isAllCycles = (cycleMonth == null || cycleMonth.trim().isEmpty() || cycleMonth.equalsIgnoreCase("ALL"));
         List<PmsAssignment> assignments;
-        if (cycleMonth != null && !cycleMonth.trim().isEmpty() && !cycleMonth.equalsIgnoreCase("ALL")) {
+        if (!isAllCycles) {
             assignments = pmsAssignmentRepository.findByCycleMonthIgnoreCase(cycleMonth.trim());
         } else {
             assignments = pmsAssignmentRepository.findAll();
@@ -588,39 +589,93 @@ public class HrLifecycleService {
         int completedCount = 0;
         int inProgressCount = 0;
 
-        for (PmsAssignment a : assignments) {
-            Employee emp = a.getEmployee();
-            boolean isFin = a.getStatus() == PMSState.COMPLETED || a.getStatus() == PMSState.FINAL_RESULT_PUBLISHED;
-            if (isFin) {
-                completedCount++;
-                if (a.getOverallScore() != null) {
-                    totalScores += a.getOverallScore();
+        if (isAllCycles) {
+            // Group by employee so NO employee is repeated in the consolidated view
+            Map<Long, List<PmsAssignment>> byEmp = new LinkedHashMap<>();
+            for (PmsAssignment a : assignments) {
+                if (a.getEmployee() != null) {
+                    byEmp.computeIfAbsent(a.getEmployee().getId(), k -> new ArrayList<>()).add(a);
                 }
-            } else {
-                inProgressCount++;
             }
 
-            Map<String, Object> row = new HashMap<>();
-            row.put("assignmentId", a.getId());
-            row.put("employeeId", emp != null ? emp.getId() : null);
-            row.put("employeeCode", emp != null && emp.getEmployeeCode() != null ? emp.getEmployeeCode() : (emp != null ? "EMP-" + emp.getId() : "-"));
-            row.put("name", emp != null ? emp.getName() : "Unknown");
-            row.put("designation", emp != null && emp.getDesignation() != null ? emp.getDesignation() : "-");
-            row.put("department", emp != null && emp.getDepartment() != null ? emp.getDepartment() : "-");
-            row.put("managerName", emp != null && emp.getManager() != null ? emp.getManager().getName() : "-");
-            row.put("cycleMonth", a.getCycleMonth() != null ? a.getCycleMonth() : "-");
-            row.put("status", a.getStatus().name());
-            row.put("overallScore", a.getOverallScore());
-            row.put("performanceGrade", a.getPerformanceGrade() != null ? a.getPerformanceGrade() : "-");
-            row.put("finalizedDate", a.getFinalizedDate() != null ? a.getFinalizedDate().toString() : "-");
-            row.put("profilePhoto", emp != null ? emp.getProfilePhoto() : null);
+            for (Map.Entry<Long, List<PmsAssignment>> entry : byEmp.entrySet()) {
+                List<PmsAssignment> empAssignments = entry.getValue();
+                PmsAssignment latest = empAssignments.get(0);
+                Employee emp = latest.getEmployee();
 
-            employeeList.add(row);
+                double empSumScore = 0.0;
+                int empCompleted = 0;
+                for (PmsAssignment ea : empAssignments) {
+                    boolean isFin = ea.getStatus() == PMSState.COMPLETED || ea.getStatus() == PMSState.FINAL_RESULT_PUBLISHED;
+                    if (isFin) {
+                        empCompleted++;
+                        if (ea.getOverallScore() != null) {
+                            empSumScore += ea.getOverallScore();
+                        }
+                    }
+                }
+
+                double avgScore = empCompleted > 0 ? Math.round((empSumScore / empCompleted) * 100.0) / 100.0 : (latest.getOverallScore() != null ? latest.getOverallScore() : 0.0);
+                boolean isLatestFin = latest.getStatus() == PMSState.COMPLETED || latest.getStatus() == PMSState.FINAL_RESULT_PUBLISHED;
+                if (isLatestFin || empCompleted > 0) {
+                    completedCount++;
+                    totalScores += avgScore;
+                } else {
+                    inProgressCount++;
+                }
+
+                Map<String, Object> row = new HashMap<>();
+                row.put("assignmentId", latest.getId());
+                row.put("employeeId", emp != null ? emp.getId() : null);
+                row.put("employeeCode", emp != null && emp.getEmployeeCode() != null ? emp.getEmployeeCode() : (emp != null ? "EMP-" + emp.getId() : "-"));
+                row.put("name", emp != null ? emp.getName() : "Unknown");
+                row.put("designation", emp != null && emp.getDesignation() != null ? emp.getDesignation() : "-");
+                row.put("department", emp != null && emp.getDepartment() != null ? emp.getDepartment() : "-");
+                row.put("managerName", emp != null && emp.getManager() != null ? emp.getManager().getName() : "-");
+                row.put("cycleMonth", empAssignments.size() > 1 ? "Consolidated (" + empAssignments.size() + " Cycles)" : latest.getCycleMonth());
+                row.put("status", latest.getStatus().name());
+                row.put("overallScore", avgScore);
+                row.put("performanceGrade", latest.getPerformanceGrade() != null ? latest.getPerformanceGrade() : "-");
+                row.put("finalizedDate", latest.getFinalizedDate() != null ? latest.getFinalizedDate().toString() : "-");
+                row.put("profilePhoto", emp != null ? emp.getProfilePhoto() : null);
+
+                employeeList.add(row);
+            }
+        } else {
+            for (PmsAssignment a : assignments) {
+                Employee emp = a.getEmployee();
+                boolean isFin = a.getStatus() == PMSState.COMPLETED || a.getStatus() == PMSState.FINAL_RESULT_PUBLISHED;
+                if (isFin) {
+                    completedCount++;
+                    if (a.getOverallScore() != null) {
+                        totalScores += a.getOverallScore();
+                    }
+                } else {
+                    inProgressCount++;
+                }
+
+                Map<String, Object> row = new HashMap<>();
+                row.put("assignmentId", a.getId());
+                row.put("employeeId", emp != null ? emp.getId() : null);
+                row.put("employeeCode", emp != null && emp.getEmployeeCode() != null ? emp.getEmployeeCode() : (emp != null ? "EMP-" + emp.getId() : "-"));
+                row.put("name", emp != null ? emp.getName() : "Unknown");
+                row.put("designation", emp != null && emp.getDesignation() != null ? emp.getDesignation() : "-");
+                row.put("department", emp != null && emp.getDepartment() != null ? emp.getDepartment() : "-");
+                row.put("managerName", emp != null && emp.getManager() != null ? emp.getManager().getName() : "-");
+                row.put("cycleMonth", a.getCycleMonth() != null ? a.getCycleMonth() : "-");
+                row.put("status", a.getStatus().name());
+                row.put("overallScore", a.getOverallScore());
+                row.put("performanceGrade", a.getPerformanceGrade() != null ? a.getPerformanceGrade() : "-");
+                row.put("finalizedDate", a.getFinalizedDate() != null ? a.getFinalizedDate().toString() : "-");
+                row.put("profilePhoto", emp != null ? emp.getProfilePhoto() : null);
+
+                employeeList.add(row);
+            }
         }
 
         Map<String, Object> result = new HashMap<>();
         result.put("cycleMonth", (cycleMonth != null && !cycleMonth.trim().isEmpty()) ? cycleMonth.trim() : "All Cycles");
-        result.put("totalEmployees", assignments.size());
+        result.put("totalEmployees", employeeList.size());
         result.put("completedCount", completedCount);
         result.put("inProgressCount", inProgressCount);
         result.put("averageScore", completedCount > 0 ? Math.round((totalScores / completedCount) * 100.0) / 100.0 : null);
